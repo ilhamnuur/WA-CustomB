@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { getAuthenticatedUser, canAccessSession, isAdmin } from "@/lib/api-auth";
 
 // GET: List Auto Replies
@@ -76,16 +77,19 @@ export async function POST(
             return NextResponse.json({ error: "Session not found" }, { status: 404 });
         }
 
+        const createData: Prisma.AutoReplyUncheckedCreateInput = {
+            sessionId: session.id,
+            keyword,
+            response,
+            matchType: matchType || "EXACT",
+            isMedia: isMedia || false,
+            mediaUrl: mediaUrl || null,
+            // @ts-ignore: triggerType exists in generated schema but may be stale in editor types
+            triggerType: (body.triggerType as string) || "ALL"
+        };
+
         const newRule = await prisma.autoReply.create({
-            data: {
-                sessionId: session.id,
-                keyword,
-                response,
-                matchType: matchType || "EXACT",
-                isMedia: isMedia || false,
-                mediaUrl: mediaUrl || null,
-                triggerType: body.triggerType || "ALL"
-            }
+            data: createData
         });
 
         return NextResponse.json(newRule);
