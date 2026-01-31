@@ -21,12 +21,12 @@ export async function GET(
         }
 
         const session = await prisma.session.findUnique({
-             where: { sessionId: sessionId },
-             select: { id: true }
+            where: { sessionId: sessionId },
+            select: { id: true }
         });
 
         if (!session) {
-             return NextResponse.json({ error: "Session not found" }, { status: 404 });
+            return NextResponse.json({ error: "Session not found" }, { status: 404 });
         }
 
         const rules = await prisma.autoReply.findMany({
@@ -56,7 +56,7 @@ export async function POST(
         }
 
         const body = await request.json();
-        const { keyword, response, matchType } = body;
+        const { keyword, response, matchType, isMedia, mediaUrl } = body;
 
         if (!keyword || !response) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -70,11 +70,11 @@ export async function POST(
         const session = await prisma.session.findUnique({
             where: { sessionId: sessionId },
             select: { id: true }
-       });
+        });
 
-       if (!session) {
+        if (!session) {
             return NextResponse.json({ error: "Session not found" }, { status: 404 });
-       }
+        }
 
         const newRule = await prisma.autoReply.create({
             data: {
@@ -82,7 +82,9 @@ export async function POST(
                 keyword,
                 response,
                 matchType: matchType || "EXACT",
-                isMedia: false
+                isMedia: isMedia || false,
+                mediaUrl: mediaUrl || null,
+                triggerType: body.triggerType || "ALL"
             }
         });
 

@@ -50,7 +50,8 @@ graph LR
 - **⚡ Pro WhatsApp Engine**: Powered by Baileys for high-speed, stable connections.
 - **📅 Advanced Scheduler**: Precise message planning with global timezone support.
 - **📢 Safe Broadcast**: Built-in anti-ban mechanisms with randomized delays (10-30s).
-- **🤖 Smart Auto-Reply**: Keywords matching (`EXACT`, `CONTAINS`, `STARTS_WITH`) with media support.
+- **🤖 Smart Auto-Reply**: Keywords matching with **Context Support** (Group/Private) and **Media**.
+- **🛡️ Granular Access Control**: Whitelist/Blacklist support for Bot Commands and Auto Replies.
 - **🔗 Enterprise Webhooks**: Robust event forwarding for messages, connections, and group updates.
 - **📇 Advanced Contacts**: Rich contact management with LID, verified names, and profile pictures.
 - **🎨 Creative Tools**: Built-in Sticker Maker with background removal (remove.bg integration).
