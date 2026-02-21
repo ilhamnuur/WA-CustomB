@@ -1,4 +1,25 @@
 
+## [v1.4.0] - 2026-02-21
+
+### Added
+- **Reply Message**: Two new endpoints for quoted replies:
+    - `POST /api/messages/{sessionId}/{jid}/{messageId}/reply` — reply via URL path
+    - `POST /api/messages/{sessionId}/{jid}/reply` — reply via request body
+    - Supports text, image (URL), captions, and mentions
+- **Star/Unstar Message**: `POST /api/messages/{sessionId}/{jid}/{messageId}/star` to star or unstar messages
+- **Message Search**: `GET /api/messages/{sessionId}/search` with full-text search, JID/type/sender filters, and pagination
+- **Documentation**: Updated Swagger and `API_DOCUMENTATION.md` with full docs for all new endpoints
+
+### Fixed
+- **Auto Reply Bug**: Fixed `matchType` default in PUT endpoint — was `"exact"` (lowercase) but handler expects `"EXACT"` (uppercase), causing updated rules to silently stop matching
+- **Contacts Block/Unblock**: Added missing `decodeURIComponent(jid)` — JIDs with `%40` encoding were not being decoded
+- **Contacts GET Auth**: Replaced `auth()` with `getAuthenticatedUser()` + `canAccessSession()` to enable API key authentication and session-level access control
+
+### Changed
+- **Consistency**: Standardized `403` error messages to `"Forbidden - Cannot access this session"` across 11 route files
+- **Consistency**: Standardized validation order (auth → params → body) across all routes
+- **Cleanup**: Removed duplicate `messages/[jid]/read` route (use `chat/[jid]/read` instead)
+
 ## [v1.3.0] - 2026-02-01
 
 ### Added
