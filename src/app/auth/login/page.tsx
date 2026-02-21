@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,16 +32,14 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [registrationEnabled, setRegistrationEnabled] = useState<boolean | null>(null);
 
-  import('react').then(({ useEffect }) => {
-    useEffect(() => {
-      fetch('/api/settings/system')
-        .then(res => res.json())
-        .then(data => {
-          setRegistrationEnabled(data?.enableRegistration !== false);
-        })
-        .catch(() => setRegistrationEnabled(true));
-    }, []);
-  });
+  useEffect(() => {
+    fetch('/api/settings/system')
+      .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+      .then(data => {
+        setRegistrationEnabled(data?.enableRegistration !== false);
+      })
+      .catch(() => setRegistrationEnabled(true));
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
