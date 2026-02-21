@@ -19,18 +19,18 @@ export async function POST(req: Request) {
     try {
         // @ts-ignore
         const user = await getAuthenticatedUser(req);
-        if (!user || (user.role !== "SUPERADMIN" && user.role !== "OWNER")) {
+        if (!user || user.role !== "SUPERADMIN") {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const body = await req.json();
-        const { appName, logoUrl, timezone } = body;
+        const { appName, logoUrl, timezone, enableRegistration } = body;
 
         // @ts-ignore
         const config = await prisma.systemConfig.upsert({
             where: { id: "default" },
-            update: { appName, logoUrl, timezone },
-            create: { id: "default", appName, logoUrl: logoUrl || "", timezone: timezone || "Asia/Jakarta" }
+            update: { appName, logoUrl, timezone, enableRegistration: enableRegistration ?? true },
+            create: { id: "default", appName, logoUrl: logoUrl || "", timezone: timezone || "Asia/Jakarta", enableRegistration: enableRegistration ?? true }
         });
 
         return NextResponse.json(config);

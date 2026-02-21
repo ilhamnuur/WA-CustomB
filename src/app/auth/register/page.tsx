@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,7 +28,7 @@ const formSchema = z.object({
     path: ["confirmPassword"],
 });
 
-function RegisterForm() {
+export default function RegisterPage() {
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -217,17 +217,5 @@ function RegisterForm() {
                 </div>
             </div>
         </div>
-    );
-}
-
-export default function RegisterPage() {
-    return (
-        <Suspense fallback={
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        }>
-            <RegisterForm />
-        </Suspense>
     );
 }
