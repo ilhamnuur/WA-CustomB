@@ -25,7 +25,8 @@ export default function SettingsPage() {
     const [systemConfig, setSystemConfig] = useState({
         appName: "WA-AKG",
         logoUrl: "",
-        timezone: "Asia/Jakarta"
+        timezone: "Asia/Jakarta",
+        enableRegistration: true
     });
     const [systemLoading, setSystemLoading] = useState(false);
 
@@ -36,7 +37,8 @@ export default function SettingsPage() {
                 setSystemConfig({
                     appName: data.appName || "WA-AKG",
                     logoUrl: data.logoUrl || "",
-                    timezone: data.timezone || "Asia/Jakarta"
+                    timezone: data.timezone || "Asia/Jakarta",
+                    enableRegistration: data.enableRegistration !== undefined ? data.enableRegistration : true
                 });
             }
         });
@@ -144,11 +146,28 @@ export default function SettingsPage() {
                                 <option value="Asia/Jayapura">Asia/Jayapura (WIT)</option>
                                 <option value="UTC">UTC</option>
                             </select>
-                            <Button onClick={handleSaveSystem} disabled={systemLoading || !isSuperAdmin}>
-                                {systemLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                            </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">Scheduler will use this timezone to parse local times.</p>
+                    </div>
+
+                    <div className="flex items-center justify-between space-x-2 pt-2 border-t border-border/50">
+                        <Label htmlFor="enable-registration" className="flex flex-col space-y-1">
+                            <span>Enable User Registration</span>
+                            <span className="font-normal text-xs text-muted-foreground">Allow new users to sign up for accounts. Turn off to keep the platform private.</span>
+                        </Label>
+                        <Switch
+                            id="enable-registration"
+                            checked={systemConfig.enableRegistration}
+                            onCheckedChange={c => setSystemConfig(prev => ({ ...prev, enableRegistration: c }))}
+                            disabled={!isSuperAdmin}
+                        />
+                    </div>
+
+                    <div className="pt-2">
+                        <Button onClick={handleSaveSystem} disabled={systemLoading || !isSuperAdmin}>
+                            {systemLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            Save Configuration
+                        </Button>
                     </div>
                 </CardContent>
             </Card>

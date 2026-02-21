@@ -245,13 +245,14 @@ model BotConfig {
 }
 
 model SystemConfig {
-  id            String   @id @default("default") // Singleton ID
-  appName       String   @default("WA-AKG")
-  logoUrl       String?
-  faviconUrl    String?
-  timezone      String   @default("Asia/Jakarta")
+  id                 String   @id @default("default") // Singleton ID
+  appName            String   @default("WA-AKG")
+  logoUrl            String?
+  faviconUrl         String?
+  timezone           String   @default("Asia/Jakarta")
+  enableRegistration Boolean  @default(true)
   
-  updatedAt     DateTime @updatedAt
+  updatedAt          DateTime @updatedAt
 }
 
 // Labels/Tags for organizing chats

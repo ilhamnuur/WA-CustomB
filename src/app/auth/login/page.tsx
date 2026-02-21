@@ -30,6 +30,18 @@ function LoginForm() {
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState<boolean | null>(null);
+
+  import('react').then(({ useEffect }) => {
+    useEffect(() => {
+      fetch('/api/settings/system')
+        .then(res => res.json())
+        .then(data => {
+          setRegistrationEnabled(data?.enableRegistration !== false);
+        })
+        .catch(() => setRegistrationEnabled(true));
+    }, []);
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -138,12 +150,14 @@ function LoginForm() {
           </Form>
         </div>
 
-        <div className="mt-8 text-center text-sm text-muted-foreground">
-          Don't have an account?{" "}
-          <Link href="/auth/register" className="font-semibold text-primary hover:text-primary/80 transition-colors">
-            Create an account
-          </Link>
-        </div>
+        {registrationEnabled !== false && (
+          <div className="mt-8 text-center text-sm text-muted-foreground">
+            Don't have an account?{" "}
+            <Link href="/auth/register" className="font-semibold text-primary hover:text-primary/80 transition-colors">
+              Create an account
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

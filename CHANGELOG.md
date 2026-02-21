@@ -1,3 +1,11 @@
+## [v1.4.1] - 2026-02-21
+
+### Added
+- **Registration Toggle**: Super Admins can now enable or disable new user registrations directly from the dashboard settings.
+- **Dynamic Auth UI**: Login and Register pages now reflect the live registration status, gracefully hiding forms or links when registration is disabled by an administrator.
+
+### Changed
+- Registration API now respects the global `enableRegistration` setting flag.
 
 ## [v1.4.0] - 2026-02-21
 

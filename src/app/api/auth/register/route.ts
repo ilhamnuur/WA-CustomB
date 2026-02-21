@@ -14,6 +14,16 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { email, password, name } = registerSchema.parse(body);
 
+        // Check if registration is enabled
+        const systemConfig = await prisma.systemConfig.findUnique({ where: { id: "default" } });
+        // @ts-ignore
+        if (systemConfig && systemConfig.enableRegistration === false) {
+            return NextResponse.json(
+                { error: "Registration is currently disabled by the administrator" },
+                { status: 403 }
+            );
+        }
+
         // Check if user already exists
         const existingUser = await prisma.user.findUnique({
             where: { email },
