@@ -46,29 +46,60 @@ export async function POST(
             id: messageId
         };
 
-        // If it's a group chat, WhatsApp Web requires the 'participant' field in the quoted key to render properly
-        if (jid.endsWith("@g.us")) {
-            try {
-                const originalMsg = await prisma.message.findUnique({
-                    where: {
-                        sessionId_keyId: {
-                            sessionId: sessionId,
-                            keyId: messageId
-                        }
-                    }
-                });
+        let quotedMessageContent: any = { conversation: "" }; // Default fallback
 
-                if (originalMsg && originalMsg.senderJid) {
+        try {
+            // Always fetch original message to build a proper quoted context for WA Web
+            const originalMsg = await prisma.message.findUnique({
+                where: {
+                    sessionId_keyId: {
+                        sessionId: sessionId,
+                        keyId: messageId
+                    }
+                }
+            });
+
+            if (originalMsg) {
+                // WA Web requires participant field for group chats
+                if (jid.endsWith("@g.us") && originalMsg.senderJid) {
                     quotedMsgKey.participant = originalMsg.senderJid;
                 }
-            } catch (dbError) {
-                console.warn("Could not fetch original message participant for group reply:", dbError);
+
+                // Mock the quoted message content based on DB so WA Web displays the snippet
+                switch (originalMsg.type) {
+                    case 'TEXT':
+                        quotedMessageContent = { conversation: originalMsg.content || "" };
+                        break;
+                    case 'IMAGE':
+                        quotedMessageContent = { imageMessage: { caption: originalMsg.content || "" } };
+                        break;
+                    case 'VIDEO':
+                        quotedMessageContent = { videoMessage: { caption: originalMsg.content || "" } };
+                        break;
+                    case 'DOCUMENT':
+                        quotedMessageContent = { documentMessage: { fileName: originalMsg.content || "Document" } };
+                        break;
+                    case 'AUDIO':
+                        quotedMessageContent = { audioMessage: {} };
+                        break;
+                    case 'STICKER':
+                        quotedMessageContent = { stickerMessage: {} };
+                        break;
+                    case 'CONTACT':
+                        quotedMessageContent = { contactMessage: { displayName: originalMsg.content || "" } };
+                        break;
+                    case 'LOCATION':
+                        quotedMessageContent = { locationMessage: {} };
+                        break;
+                }
             }
+        } catch (dbError) {
+            console.warn("Could not fetch original message for quoted reply context:", dbError);
         }
 
         const quotedMsg = {
             key: quotedMsgKey,
-            message: {}
+            message: quotedMessageContent
         };
 
         // Process message payload (same as /send)
