@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -30,16 +30,6 @@ function LoginForm() {
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [registrationEnabled, setRegistrationEnabled] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    fetch('/api/settings/system')
-      .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-      .then(data => {
-        setRegistrationEnabled(data?.enableRegistration !== false);
-      })
-      .catch(() => setRegistrationEnabled(true));
-  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -148,14 +138,12 @@ function LoginForm() {
           </Form>
         </div>
 
-        {registrationEnabled !== false && (
-          <div className="mt-8 text-center text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <Link href="/auth/register" className="font-semibold text-primary hover:text-primary/80 transition-colors">
-              Create an account
-            </Link>
-          </div>
-        )}
+        <div className="mt-8 text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link href="/auth/register" className="font-semibold text-primary hover:text-primary/80 transition-colors">
+            Create an account
+          </Link>
+        </div>
       </div>
     </div>
   );

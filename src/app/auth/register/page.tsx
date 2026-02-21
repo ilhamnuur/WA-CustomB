@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -28,21 +28,11 @@ const formSchema = z.object({
     path: ["confirmPassword"],
 });
 
-function RegisterForm() {
+export default function RegisterPage() {
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [registrationEnabled, setRegistrationEnabled] = useState<boolean | null>(null);
-
-    useEffect(() => {
-        fetch('/api/settings/system')
-            .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-            .then(data => {
-                setRegistrationEnabled(data?.enableRegistration !== false);
-            })
-            .catch(() => setRegistrationEnabled(true));
-    }, []);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -98,32 +88,6 @@ function RegisterForm() {
                     <h2 className="text-2xl font-bold text-foreground mb-2">Registration Successful!</h2>
                     <p className="text-muted-foreground">Redirecting you to the login page...</p>
                 </div>
-            </div>
-        );
-    }
-
-    if (registrationEnabled === false) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-background relative overflow-hidden">
-                <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] bg-amber-500/20 rounded-full blur-[120px] pointer-events-none" />
-                <div className="glass-panel p-10 rounded-3xl flex flex-col items-center text-center max-w-sm animate-in zoom-in duration-500">
-                    <div className="h-16 w-16 bg-amber-500/20 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-amber-500/30 border border-amber-500/50">
-                        <Bot className="h-8 w-8 text-amber-500" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-foreground mb-2">Registration Disabled</h2>
-                    <p className="text-muted-foreground mb-6">The administrator has currently disabled new account registrations.</p>
-                    <Link href="/auth/login">
-                        <Button variant="outline" className="w-full">Return to Login</Button>
-                    </Link>
-                </div>
-            </div>
-        );
-    }
-
-    if (registrationEnabled === null) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -253,17 +217,5 @@ function RegisterForm() {
                 </div>
             </div>
         </div>
-    );
-}
-
-export default function RegisterPage() {
-    return (
-        <Suspense fallback={
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        }>
-            <RegisterForm />
-        </Suspense>
     );
 }
