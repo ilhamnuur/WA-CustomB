@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { waManager } from "@/modules/whatsapp/manager";
 import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
+import { prisma } from "@/lib/prisma";
 
 /**
  * POST /api/messages/{sessionId}/{jid}/{messageId}/reply
@@ -39,12 +40,34 @@ export async function POST(
         }
 
         // Construct the quoted message key
+        const quotedMsgKey: any = {
+            remoteJid: jid,
+            fromMe: fromMe === true,
+            id: messageId
+        };
+
+        // If it's a group chat, WhatsApp Web requires the 'participant' field in the quoted key to render properly
+        if (jid.endsWith("@g.us")) {
+            try {
+                const originalMsg = await prisma.message.findUnique({
+                    where: {
+                        sessionId_keyId: {
+                            sessionId: sessionId,
+                            keyId: messageId
+                        }
+                    }
+                });
+
+                if (originalMsg && originalMsg.senderJid) {
+                    quotedMsgKey.participant = originalMsg.senderJid;
+                }
+            } catch (dbError) {
+                console.warn("Could not fetch original message participant for group reply:", dbError);
+            }
+        }
+
         const quotedMsg = {
-            key: {
-                remoteJid: jid,
-                fromMe: fromMe === true,
-                id: messageId
-            },
+            key: quotedMsgKey,
             message: {}
         };
 
