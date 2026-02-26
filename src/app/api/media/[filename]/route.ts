@@ -2,10 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
 import { existsSync } from "fs";
-import { getAuthenticatedUser } from "@/lib/api-auth";
+import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
 
 // Media directory — private, NOT in public/
 const MEDIA_DIR = path.join(process.cwd(), "data", "media");
+
+/**
+ * Extract sessionId from media filename.
+ * Format: {sessionId}-{messageId}.{ext}
+ * e.g. "marketing-1-ABCDEF123456.jpg" → "marketing-1"
+ */
+function extractSessionId(filename: string): string | null {
+    // Remove extension
+    const base = filename.replace(/\.[^.]+$/, "");
+    // The last segment after the last "-" is the messageId
+    const lastDash = base.lastIndexOf("-");
+    if (lastDash <= 0) return null;
+    return base.substring(0, lastDash);
+}
 
 export async function GET(
     request: NextRequest,
@@ -23,6 +37,15 @@ export async function GET(
         // Security: Prevent directory traversal
         if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
             return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
+        }
+
+        // Session ownership check — extract sessionId from filename
+        const sessionId = extractSessionId(filename);
+        if (sessionId) {
+            const canAccess = await canAccessSession(user.id, user.role, sessionId);
+            if (!canAccess) {
+                return NextResponse.json({ error: "Forbidden - Cannot access this session's media" }, { status: 403 });
+            }
         }
 
         const filePath = path.join(MEDIA_DIR, filename);
