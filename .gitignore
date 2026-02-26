@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# media files (downloaded by app)
+/data/media/*
+!/data/media/.gitkeep
+/public/media/*
