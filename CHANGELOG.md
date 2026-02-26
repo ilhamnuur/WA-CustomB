@@ -17,8 +17,24 @@
     - **Dotted Background**: Subtle dot pattern in chat window for visual depth.
     - **Mobile Back Button**: Integrated back button in chat header for mobile navigation.
     - **Colored Attachment Menu**: Each media type has a distinct color icon.
+- **Media Management Page** (`/dashboard/media`):
+    - Stats cards: total storage size, file count, images, and media breakdown.
+    - Search and filter by type (image, video, audio, document).
+    - Grid view with image thumbnails and file metadata.
+    - Multi-select and bulk delete functionality.
+    - Full-screen image preview modal.
+- **Media Security API**:
+    - `GET /api/media` — List all media files with metadata (requires auth).
+    - `DELETE /api/media` — Bulk delete files by filename (requires auth).
 - **Shared JID Utilities**: New `src/lib/jid-utils.ts` module with `resolveToPhoneJid()`, `batchResolveToPhoneJid()`, and `isLidJid()` for consistent JID handling across the entire codebase.
 - **Tooltip UI Component**: Added `@radix-ui/react-tooltip` dependency and `src/components/ui/tooltip.tsx`.
+
+### Security
+- **Media Storage Hardened**: Moved media files from `public/media/` (publicly accessible) to `data/media/` (private, requires authentication to access via API).
+- **Middleware Bypass Fixed**: Removed dangerous `pathname.startsWith("/media")` and `pathname.includes(".")` rules that allowed unauthenticated access to media files and any URL containing a dot.
+- **Media API Secured**: `GET /api/media/[filename]` now requires `getAuthenticatedUser()` (session or API key). Added `path.resolve()` check to prevent directory traversal attacks.
+- **Security Headers**: Added `X-Content-Type-Options: nosniff` and `Cache-Control: private` to media responses.
+- **Default Catch-All**: Middleware now requires authentication for all unmatched routes instead of passing through.
 
 ### Fixed
 - **JID Consistency (Webhooks)**: Webhook payloads (`from`, `sender`, `participant`) now always use `@s.whatsapp.net` format instead of `@lid`. Uses a three-tier resolution: inline `remoteJidAlt` → DB Contact lookup → fallback.
