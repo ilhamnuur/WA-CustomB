@@ -1,9 +1,10 @@
 import { prisma } from "./prisma";
 import crypto from "crypto";
-import { normalizeMessageContent, downloadMediaMessage, WAMessage, isLidUser } from "@whiskeysockets/baileys";
+import { normalizeMessageContent, downloadMediaMessage, WAMessage } from "@whiskeysockets/baileys";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import pino from "pino";
+import { resolveToPhoneJidBySessionId as resolveToPhoneJid, isLidJid } from "./jid-utils";
 
 // Event types that can trigger webhooks
 export type WebhookEventType =
@@ -378,77 +379,6 @@ function getChatType(jid: string): "PERSONAL" | "GROUP" | "STATUS" | "NEWSLETTER
     return "UNKNOWN";
 }
 
-/**
- * Check if a JID is in @lid format
- */
-function isLidJid(jid: string | undefined): boolean {
-    if (!jid) return false;
-    return jid.endsWith("@lid");
-}
-
-/**
- * Resolve a @lid JID to @s.whatsapp.net phone number JID.
- * Uses:
- *   1. Inline remoteJidAlt (from Baileys message key) if provided
- *   2. DB Contact lookup (contact.remoteJidAlt or matching by lid field)
- *   3. Falls back to the original JID if no resolution is found
- *
- * For non-LID JIDs: returns the original JID unchanged.
- * For group JIDs (@g.us) or broadcast: returns unchanged.
- */
-async function resolveToPhoneJid(
-    jid: string,
-    sessionId: string,
-    inlineAlt?: string | null
-): Promise<string> {
-    if (!jid) return jid;
-
-    // Only resolve if it's a @lid JID
-    if (!isLidJid(jid)) return jid;
-
-    // 1. Use inline remoteJidAlt if provided
-    if (inlineAlt && !isLidJid(inlineAlt)) {
-        return inlineAlt;
-    }
-
-    // 2. Try DB lookup
-    try {
-        const session = await prisma.session.findUnique({
-            where: { sessionId },
-            select: { id: true }
-        });
-
-        if (session) {
-            // Look up by JID first (the Contact might be stored with @lid as primary JID)
-            const contact = await prisma.contact.findFirst({
-                where: {
-                    sessionId: session.id,
-                    OR: [
-                        { jid: jid },
-                        { lid: jid }
-                    ]
-                },
-                select: { jid: true, remoteJidAlt: true, lid: true }
-            });
-
-            if (contact) {
-                // If remoteJidAlt is a phone JID, use it
-                if (contact.remoteJidAlt && !isLidJid(contact.remoteJidAlt)) {
-                    return contact.remoteJidAlt;
-                }
-                // If the primary jid is a phone JID, use it
-                if (contact.jid && !isLidJid(contact.jid)) {
-                    return contact.jid;
-                }
-            }
-        }
-    } catch (e) {
-        console.error(`resolveToPhoneJid: DB lookup failed for ${jid}`, e);
-    }
-
-    // 3. Fallback: return original JID
-    return jid;
-}
 
 /**
  * Helper to dispatch connection update event
