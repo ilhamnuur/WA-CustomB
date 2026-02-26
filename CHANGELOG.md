@@ -18,14 +18,19 @@
     - **Mobile Back Button**: Integrated back button in chat header for mobile navigation.
     - **Colored Attachment Menu**: Each media type has a distinct color icon.
 - **Media Management Page** (`/dashboard/media`):
+    - Per-user access control — users only see media from their own sessions.
+    - Grouped view: files organized by **Session** → **Sender/From** (collapsible sections).
+    - Sender info enriched from database (pushName, senderJid via batch keyId lookup).
     - Stats cards: total storage size, file count, images, and media breakdown.
-    - Search and filter by type (image, video, audio, document).
+    - Search and filter by type, filename, session, or sender name.
     - Grid view with image thumbnails and file metadata.
-    - Multi-select and bulk delete functionality.
+    - Multi-select and bulk delete with per-group "Select All".
     - Full-screen image preview modal.
+    - SUPERADMIN sees all sessions' media; other users see only their own.
 - **Media Security API**:
-    - `GET /api/media` — List all media files with metadata (requires auth).
-    - `DELETE /api/media` — Bulk delete files by filename (requires auth).
+    - `GET /api/media` — List media files with sender metadata, filtered by session ownership.
+    - `GET /api/media/[filename]` — Serve media with session ownership check.
+    - `DELETE /api/media` — Bulk delete with per-file session ownership verification.
 - **Shared JID Utilities**: New `src/lib/jid-utils.ts` module with `resolveToPhoneJid()`, `batchResolveToPhoneJid()`, and `isLidJid()` for consistent JID handling across the entire codebase.
 - **Tooltip UI Component**: Added `@radix-ui/react-tooltip` dependency and `src/components/ui/tooltip.tsx`.
 
@@ -33,6 +38,7 @@
 - **Media Storage Hardened**: Moved media files from `public/media/` (publicly accessible) to `data/media/` (private, requires authentication to access via API).
 - **Middleware Bypass Fixed**: Removed dangerous `pathname.startsWith("/media")` and `pathname.includes(".")` rules that allowed unauthenticated access to media files and any URL containing a dot.
 - **Media API Secured**: `GET /api/media/[filename]` now requires `getAuthenticatedUser()` (session or API key). Added `path.resolve()` check to prevent directory traversal attacks.
+- **Media Session Ownership**: All media endpoints enforce `canAccessSession()` — users can only view, serve, and delete media belonging to their own sessions.
 - **Security Headers**: Added `X-Content-Type-Options: nosniff` and `Cache-Control: private` to media responses.
 - **Default Catch-All**: Middleware now requires authentication for all unmatched routes instead of passing through.
 
