@@ -11,13 +11,17 @@ export async function middleware(request: NextRequest) {
     // Check if it's a public route
     const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
 
-    // Allow static files and Next.js internals
+    // Allow Next.js internals and favicon only
     if (
         pathname.startsWith("/_next") ||
-        pathname.startsWith("/favicon") ||
-        pathname.startsWith("/media") ||
-        pathname.includes(".") // static files
+        pathname === "/favicon.ico"
     ) {
+        return NextResponse.next();
+    }
+
+    // Allow known static asset extensions in root path only (e.g. /vercel.svg)
+    const staticExtensions = [".svg", ".ico", ".png", ".jpg", ".jpeg", ".webp", ".woff", ".woff2", ".ttf"];
+    if (pathname.lastIndexOf("/") === 0 && staticExtensions.some(ext => pathname.endsWith(ext))) {
         return NextResponse.next();
     }
 
@@ -32,7 +36,6 @@ export async function middleware(request: NextRequest) {
         const apiKey = request.headers.get("x-api-key");
         if (apiKey) {
             // API key auth will be validated in the route handler
-            // Just pass through here, route handler will validate
             return NextResponse.next();
         }
 
@@ -50,7 +53,6 @@ export async function middleware(request: NextRequest) {
         const session = await auth();
 
         if (!session?.user) {
-            // Redirect to login page
             const loginUrl = new URL("/auth/login", request.url);
             loginUrl.searchParams.set("callbackUrl", pathname);
             return NextResponse.redirect(loginUrl);
@@ -59,38 +61,37 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // Root path (Landing Page) is public, but if logged in, they can stay or navigate themselves.
-    // The previous logic redirected to dashboard if logged in, let's keep it that way for UX.
+    // Root path — redirect to dashboard if logged in
     if (pathname === "/") {
         const session = await auth();
         if (session?.user) {
             return NextResponse.redirect(new URL("/dashboard", request.url));
         }
-        return NextResponse.next(); // Root path is public if not logged in
+        return NextResponse.next();
     }
 
     // Public routes
     if (isPublicRoute) {
         const session = await auth();
-        // If logged in and trying to go to auth pages, redirect to dashboard
         if (session?.user && (pathname.startsWith("/auth/login") || pathname.startsWith("/auth/register"))) {
             return NextResponse.redirect(new URL("/dashboard", request.url));
         }
         return NextResponse.next();
     }
 
-    // Default catch-all
+    // Default: require auth for everything else
+    const session = await auth();
+    if (!session?.user) {
+        const loginUrl = new URL("/auth/login", request.url);
+        loginUrl.searchParams.set("callbackUrl", pathname);
+        return NextResponse.redirect(loginUrl);
+    }
+
     return NextResponse.next();
 }
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         */
         "/((?!_next/static|_next/image|favicon.ico).*)",
     ],
 };

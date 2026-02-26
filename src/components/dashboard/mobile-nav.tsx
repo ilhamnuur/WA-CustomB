@@ -22,6 +22,7 @@ import {
     Send,
     UserCheck,
     Megaphone,
+    HardDrive,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -74,6 +75,7 @@ const navGroups: NavGroup[] = [
         label: "Administration",
         items: [
             { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode },
+            { href: "/dashboard/media", label: "Media Manager", icon: HardDrive },
             { href: "/dashboard/users", label: "Users", icon: Users },
             { href: "/dashboard/settings", label: "Settings", icon: Settings },
             { href: "/dashboard/notifications", label: "Notifications", icon: Bell, superadminOnly: true },

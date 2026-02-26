@@ -196,7 +196,7 @@ export async function downloadAndSaveMedia(message: WAMessage, sessionId: string
         }
 
         const filename = `${sessionId}-${message.key.id}.${ext}`;
-        const filePath = path.join(process.cwd(), "public", "media", filename);
+        const filePath = path.join(process.cwd(), "data", "media", filename);
 
         console.log(`MediaDownload: Saving to ${filePath}`);
 
