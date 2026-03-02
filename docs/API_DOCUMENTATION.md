@@ -359,6 +359,11 @@ Content-Type: application/json
 | `enablePing` | boolean | No | — |
 | `enableUptime` | boolean | No | — |
 | `removeBgApiKey` | string, nullable | No | — |
+| `antiSpamEnabled` | boolean | No | Enable random delays to avoid WhatsApp bans |
+| `spamLimit` | integer | No | Max messages allowed in the interval window (default 5) |
+| `spamInterval` | integer | No | Time window in seconds (default 10) |
+| `spamDelayMin` | integer | No | Min random delay in ms (default 1000) |
+| `spamDelayMax` | integer | No | Max random delay in ms (default 3000) |
 
 **Example:**
 

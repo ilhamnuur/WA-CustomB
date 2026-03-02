@@ -14,6 +14,7 @@ import { syncGroups } from "./store/groups";
 import { bindContactSync } from "./store/contacts";
 import { bindAutoReply } from "./store/autoreply";
 import { bindPpGuard } from "./store/ppguard";
+import { antispam } from "./antispam";
 
 export class WhatsAppInstance {
     socket: WASocket | null = null;
@@ -38,7 +39,7 @@ export class WhatsAppInstance {
         this.isStopped = false; // Reset stop flag on init
         const sessionData = await prisma.session.findUnique({ where: { sessionId: this.sessionId } });
         this.config = sessionData?.config || {};
-        
+
         const { state, saveCreds } = await usePrismaAuthState(this.sessionId);
         const { version } = await fetchLatestBaileysVersion();
 
@@ -54,17 +55,21 @@ export class WhatsAppInstance {
             markOnlineOnConnect: true,
             syncFullHistory: true, // Enable history sync to get contacts
         });
-        
+
+        // Apply Anti-Spam Wrapper
+        // We do this immediately after socket creation to intercept all sends
+        await antispam.wrap(this.socket, this.sessionId);
+
         // Bind Store for DB Sync (handles incoming messages)
         bindSessionStore(this.socket, this.sessionId, this.io);
-        
+
         // Bind Contact Sync (handles contacts.update and messaging-history.set events)
         bindContactSync(this.socket, this.sessionId);
 
         this.socket.ev.on("creds.update", saveCreds);
 
         this.socket.ev.on("connection.update", async (update) => {
-             await this.handleConnectionUpdate(update);
+            await this.handleConnectionUpdate(update);
         });
     }
 
@@ -76,24 +81,24 @@ export class WhatsAppInstance {
                 if (this.isStopped) return; // Don't emit QR if stopped
                 this.qr = qr;
                 this.status = "SCAN_QR";
-                
+
                 // Emit QR to Socket Room
                 this.io?.to(this.sessionId).emit("connection.update", { status: this.status, qr });
-                
+
                 // Update DB
                 await prisma.session.update({
                     where: { sessionId: this.sessionId },
                     data: { qr, status: "SCAN_QR" }
                 });
             }
-            
+
             if (connection === "close") {
                 const code = (lastDisconnect?.error as any)?.output?.statusCode;
                 const isLoggedOut = code === DisconnectReason.loggedOut;
-                
+
                 // Only reconnect if NOT logged out AND NOT explicitly stopped
                 const shouldReconnect = !isLoggedOut && !this.isStopped;
-                
+
                 // Determine status based on reason
                 if (isLoggedOut) {
                     this.status = "LOGGED_OUT";
@@ -102,9 +107,9 @@ export class WhatsAppInstance {
                 } else {
                     this.status = "DISCONNECTED";
                 }
-                
+
                 this.io?.to(this.sessionId).emit("connection.update", { status: this.status, qr: null });
-                 
+
                 // Use try-catch specifically for update as session might be deleted
                 try {
                     await prisma.session.update({
@@ -147,19 +152,19 @@ export class WhatsAppInstance {
                 this.status = "CONNECTED";
                 this.qr = null;
                 this.startTime = new Date();
-                
+
                 this.io?.to(this.sessionId).emit("connection.update", { status: this.status, qr: null });
-                
+
                 // Sync Groups from WhatsApp (with error handling)
                 try {
                     await syncGroups(this.socket as WASocket, this.sessionId);
                 } catch (e) {
                     console.error("Group sync failed:", e);
                 }
-                
+
                 // Bind Auto Reply
                 bindAutoReply(this.socket as WASocket, this.sessionId);
-                
+
                 // Bind PP Guard
                 bindPpGuard(this.socket as WASocket, this.sessionId);
 
@@ -167,7 +172,7 @@ export class WhatsAppInstance {
                     where: { sessionId: this.sessionId },
                     data: { status: "CONNECTED", qr: null }
                 });
-                
+
                 console.log(`Session ${this.sessionId} connected and synced successfully`);
             }
         } catch (error: any) {

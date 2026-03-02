@@ -24,7 +24,12 @@ export default function BotSettingsPage() {
         enableUptime: true,
         removeBgApiKey: "",
         botMode: "OWNER",
-        autoReplyMode: "ALL"
+        autoReplyMode: "ALL",
+        antiSpamEnabled: false,
+        spamLimit: 5,
+        spamInterval: 10,
+        spamDelayMin: 1000,
+        spamDelayMax: 3000
     });
     const [botLoading, setBotLoading] = useState(false);
 
@@ -221,6 +226,90 @@ export default function BotSettingsPage() {
                                 <Button onClick={handleSaveBot} disabled={botLoading || !sessionId}>
                                     {botLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                                     Save Bot Configuration
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Anti-Ban Protection */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <AlertCircle className="h-5 w-5 text-orange-500" />
+                                Anti-Ban Protection (Beta)
+                            </CardTitle>
+                            <CardDescription>
+                                Add random delays between messages to mimic human behavior and avoid WhatsApp spam detection.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex items-center justify-between space-x-2 border p-3 rounded-lg bg-orange-500/5 border-orange-500/20">
+                                <Label htmlFor="anti-spam" className="flex flex-col space-y-1">
+                                    <span className="font-semibold text-orange-700">Enable Anti-Spam Delay</span>
+                                    <span className="font-normal text-xs text-muted-foreground">Automatically delay messages when sending in high frequency.</span>
+                                </Label>
+                                <Switch id="anti-spam" checked={botConfig.antiSpamEnabled}
+                                    onCheckedChange={c => setBotConfig(prev => ({ ...prev, antiSpamEnabled: c }))} />
+                            </div>
+
+                            {botConfig.antiSpamEnabled && (
+                                <div className="grid gap-6 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <div className="grid sm:grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label>Messages Threshold</Label>
+                                            <Input
+                                                type="number"
+                                                value={botConfig.spamLimit}
+                                                onChange={e => setBotConfig(prev => ({ ...prev, spamLimit: parseInt(e.target.value) || 1 }))}
+                                                min={1}
+                                            />
+                                            <p className="text-xs text-muted-foreground">Allow X messages...</p>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label>Time Window (Seconds)</Label>
+                                            <Input
+                                                type="number"
+                                                value={botConfig.spamInterval}
+                                                onChange={e => setBotConfig(prev => ({ ...prev, spamInterval: parseInt(e.target.value) || 1 }))}
+                                                min={1}
+                                            />
+                                            <p className="text-xs text-muted-foreground">...within Y seconds before applying delay.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid sm:grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label>Min Delay (ms)</Label>
+                                            <Input
+                                                type="number"
+                                                value={botConfig.spamDelayMin}
+                                                onChange={e => setBotConfig(prev => ({ ...prev, spamDelayMin: parseInt(e.target.value) || 0 }))}
+                                                min={0}
+                                                step={100}
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label>Max Delay (ms)</Label>
+                                            <Input
+                                                type="number"
+                                                value={botConfig.spamDelayMax}
+                                                onChange={e => setBotConfig(prev => ({ ...prev, spamDelayMax: parseInt(e.target.value) || 0 }))}
+                                                min={0}
+                                                step={100}
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground italic">
+                                        * Delay will be a random number between Min and Max values.
+                                        Recommended: 1000ms - 3000ms for safety.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="pt-2">
+                                <Button onClick={handleSaveBot} disabled={botLoading || !sessionId}>
+                                    {botLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    Save Protection Settings
                                 </Button>
                             </div>
                         </CardContent>
