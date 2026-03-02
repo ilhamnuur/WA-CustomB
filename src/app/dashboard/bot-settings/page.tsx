@@ -239,14 +239,14 @@ export default function BotSettingsPage() {
                                 Anti-Ban Protection (Beta)
                             </CardTitle>
                             <CardDescription>
-                                Add random delays between messages to mimic human behavior and avoid WhatsApp spam detection.
+                                Prevent your WhatsApp number from being detected as spam or banned by adding intelligent random delays between outgoing messages. This applies to <strong>all</strong> actions: bot replies, auto-replies, broadcasts, scheduled messages, and API calls for this session.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="flex items-center justify-between space-x-2 border p-3 rounded-lg bg-orange-500/5 border-orange-500/20">
                                 <Label htmlFor="anti-spam" className="flex flex-col space-y-1">
-                                    <span className="font-semibold text-orange-700">Enable Anti-Spam Delay</span>
-                                    <span className="font-normal text-xs text-muted-foreground">Automatically delay messages when sending in high frequency.</span>
+                                    <span className="font-semibold text-orange-700 dark:text-orange-400">Enable Anti-Spam Delay</span>
+                                    <span className="font-normal text-xs text-muted-foreground">When enabled, messages will be queued and sent with a random delay if the rate limit is reached. Messages are never rejected — only delayed.</span>
                                 </Label>
                                 <Switch id="anti-spam" checked={botConfig.antiSpamEnabled}
                                     onCheckedChange={c => setBotConfig(prev => ({ ...prev, antiSpamEnabled: c }))} />
@@ -254,32 +254,54 @@ export default function BotSettingsPage() {
 
                             {botConfig.antiSpamEnabled && (
                                 <div className="grid gap-6 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    {/* How it works */}
+                                    <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4 space-y-2">
+                                        <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">💡 How it works</p>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            The system tracks how many messages this session sends within a time window.
+                                            If the number of messages exceeds the <strong>threshold</strong> within the <strong>time window</strong>,
+                                            each subsequent message will be <strong>delayed</strong> by a random amount between <strong>Min</strong> and <strong>Max</strong> delay.
+                                            Once the time window resets (old messages expire), messages go back to normal speed.
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            <strong>Example:</strong> With threshold = <strong>{botConfig.spamLimit}</strong> and window = <strong>{botConfig.spamInterval}s</strong> →
+                                            the first {botConfig.spamLimit} messages within {botConfig.spamInterval} seconds are sent instantly.
+                                            Message #{botConfig.spamLimit + 1} and beyond will be delayed by {botConfig.spamDelayMin}ms–{botConfig.spamDelayMax}ms each.
+                                        </p>
+                                    </div>
+
                                     <div className="grid sm:grid-cols-2 gap-4">
                                         <div className="grid gap-2">
-                                            <Label>Messages Threshold</Label>
+                                            <Label className="font-semibold">Messages Threshold</Label>
                                             <Input
                                                 type="number"
                                                 value={botConfig.spamLimit}
                                                 onChange={e => setBotConfig(prev => ({ ...prev, spamLimit: parseInt(e.target.value) || 1 }))}
                                                 min={1}
                                             />
-                                            <p className="text-xs text-muted-foreground">Allow X messages...</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Number of messages allowed at full speed before delay kicks in.
+                                                <span className="text-orange-600 dark:text-orange-400"> Lower = safer but slower.</span>
+                                            </p>
                                         </div>
                                         <div className="grid gap-2">
-                                            <Label>Time Window (Seconds)</Label>
+                                            <Label className="font-semibold">Time Window (Seconds)</Label>
                                             <Input
                                                 type="number"
                                                 value={botConfig.spamInterval}
                                                 onChange={e => setBotConfig(prev => ({ ...prev, spamInterval: parseInt(e.target.value) || 1 }))}
                                                 min={1}
                                             />
-                                            <p className="text-xs text-muted-foreground">...within Y seconds before applying delay.</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                The rolling window to count messages. After this time passes, the counter resets naturally.
+                                                <span className="text-orange-600 dark:text-orange-400"> Longer = more conservative.</span>
+                                            </p>
                                         </div>
                                     </div>
 
                                     <div className="grid sm:grid-cols-2 gap-4">
                                         <div className="grid gap-2">
-                                            <Label>Min Delay (ms)</Label>
+                                            <Label className="font-semibold">Min Delay (ms)</Label>
                                             <Input
                                                 type="number"
                                                 value={botConfig.spamDelayMin}
@@ -287,9 +309,12 @@ export default function BotSettingsPage() {
                                                 min={0}
                                                 step={100}
                                             />
+                                            <p className="text-xs text-muted-foreground">
+                                                Minimum random delay applied. 1000ms = 1 second.
+                                            </p>
                                         </div>
                                         <div className="grid gap-2">
-                                            <Label>Max Delay (ms)</Label>
+                                            <Label className="font-semibold">Max Delay (ms)</Label>
                                             <Input
                                                 type="number"
                                                 value={botConfig.spamDelayMax}
@@ -297,12 +322,18 @@ export default function BotSettingsPage() {
                                                 min={0}
                                                 step={100}
                                             />
+                                            <p className="text-xs text-muted-foreground">
+                                                Maximum random delay applied. 3000ms = 3 seconds.
+                                            </p>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-muted-foreground italic">
-                                        * Delay will be a random number between Min and Max values.
-                                        Recommended: 1000ms - 3000ms for safety.
-                                    </p>
+
+                                    <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3">
+                                        <p className="text-xs text-muted-foreground">
+                                            ⚠️ <strong>Recommended safe settings:</strong> Threshold <strong>5</strong>, Window <strong>10s</strong>, Delay <strong>1000–3000ms</strong>.
+                                            For high-volume broadcasts, use Threshold <strong>3</strong> with Delay <strong>2000–5000ms</strong>.
+                                        </p>
+                                    </div>
                                 </div>
                             )}
 
