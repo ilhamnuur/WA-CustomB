@@ -57,11 +57,11 @@ export class WhatsAppInstance {
         });
 
         // Apply Anti-Spam Wrapper to sendMessage
-        // This wraps the socket's sendMessage so ALL outgoing messages go through rate limiting
+        // This wraps the socket's sendMessage so ALL outgoing messages go through the queue
         const originalSendMessage = this.socket.sendMessage.bind(this.socket);
         const sessionId = this.sessionId;
         this.socket.sendMessage = async function (jid: string, content: any, options?: any) {
-            await antispam.applyDelay(sessionId);
+            await antispam.enqueue(sessionId, jid, content);
             return originalSendMessage(jid, content, options);
         } as any;
 
