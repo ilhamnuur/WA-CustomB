@@ -1,3 +1,46 @@
+## [v1.5.1-beta.1] - 2026-03-02
+
+### Added
+- **Anti-Ban Protection (Anti-Spam Rate Limit)**:
+    - Per-session message queue system to prevent WhatsApp from detecting spam and banning accounts.
+    - Configurable **Messages Threshold**, **Time Window**, **Min Delay**, and **Max Delay** via Bot Settings.
+    - FIFO queue ensures messages are sent in order with randomized delays between sends.
+    - Applies to **all** outgoing messages universally: bot replies, auto-replies, broadcasts, scheduled messages, and API calls.
+    - Detailed console logging with queue status, message types, delay info, and estimated send times:
+        - `📥 QUEUED` — Message enters the queue with position number.
+        - `⏳ DELAY` — Rate limit reached, showing delay duration and queue depth.
+        - `✅ SENDING/INSTANT` — Message dispatched with total wait time.
+    - Config cached for 10 seconds to avoid excessive database queries.
+    - Uses raw SQL queries for maximum compatibility (no Prisma client regeneration required).
+- **Configurable Bot Command Prefix**:
+    - New setting in Bot Settings to change the bot command prefix (default `#`, max 3 characters).
+    - `command-handler.ts` now reads prefix from database instead of hardcoded value.
+    - Menu command dynamically displays the configured prefix.
+- **Max Sticker Duration UI**:
+    - Added slider control (3–30 seconds) in Bot Settings for `maxStickerDuration`.
+    - Previously only configurable via database — now accessible in the dashboard.
+
+### Changed
+- **Alert System Overhaul**:
+    - Replaced native `alert()` in Broadcast page with `toast.error()` from Sonner.
+    - Replaced native `confirm()` in Media page with AlertDialog for file deletion.
+    - Added AlertDialog confirmation for API key regeneration in Webhooks page.
+- **Mobile Responsiveness**:
+    - Applied responsive design patterns across 12 dashboard pages: Groups, Scheduler, Auto Reply, Broadcast, Sticker, Users, Notifications, Webhooks, Settings, Bot Settings, API Docs, and Contacts.
+    - Headers wrap on mobile (`flex-col sm:flex-row`), form grids stack (`grid-cols-1 sm:grid-cols-2`), dialog widths constrained, font sizes adjusted.
+- **API Documentation Refactor**:
+    - Standardized all response schemas in `API_DOCUMENTATION.md` to reflect the new `{ status: boolean, message: string, data: object }` format instead of the legacy `{ success: boolean }`.
+    - Enriched the Session GET documentation to show `botConfig`, `webhooks`, and `_count` relationships.
+
+### Fixed
+- **API Quick Reference Bug**: Fixed completely outdated REST API endpoints in the Python and Node.js examples (e.g., changing `/api/chat/send` to `/api/messages/{sessionId}/{jid}/send`).
+- **JID Encoding in Docs**: Added explicit `@` symbol URL encoding (`%40s.whatsapp.net`) to code examples to prevent 404 router errors.
+- **Swagger UI Warning**: Suppressed `UNSAFE_componentWillReceiveProps` console warning from `ModelCollapse` component in Swagger UI page.
+- **Anti-Spam Reliability**: Fixed socket wrapping being lost on reconnection — now wraps `sendMessage` inline in `init()` so it persists across session reconnects.
+- **Prisma Schema**: Added `prefix`, `antiSpamEnabled`, `spamLimit`, `spamInterval`, `spamDelayMin`, `spamDelayMax` fields to `BotConfig` model.
+
+---
+
 ## [v1.5.0] - 2026-02-26
 
 ### Added

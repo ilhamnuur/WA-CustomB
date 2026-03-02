@@ -45,7 +45,12 @@ export async function GET(
             removeBgApiKey: null,
             enableVideoSticker: true,
             maxStickerDuration: 10,
-            prefix: "#"
+            prefix: "#",
+            antiSpamEnabled: false,
+            spamLimit: 5,
+            spamInterval: 10,
+            spamDelayMin: 1000,
+            spamDelayMax: 3000
         };
 
         return NextResponse.json({ status: true, message: "Bot config fetched successfully", data: session.botConfig });
@@ -99,6 +104,11 @@ export async function POST(
                 enableUptime: body.enableUptime ?? true,
                 removeBgApiKey: body.removeBgApiKey || null,
                 prefix: body.prefix || "#",
+                antiSpamEnabled: body.antiSpamEnabled ?? false,
+                spamLimit: body.spamLimit || 5,
+                spamInterval: body.spamInterval || 10,
+                spamDelayMin: body.spamDelayMin || 1000,
+                spamDelayMax: body.spamDelayMax || 3000,
             },
             update: {
                 botMode: body.botMode,
@@ -115,6 +125,11 @@ export async function POST(
                 enableUptime: body.enableUptime,
                 removeBgApiKey: body.removeBgApiKey || null,
                 prefix: body.prefix,
+                antiSpamEnabled: body.antiSpamEnabled,
+                spamLimit: body.spamLimit,
+                spamInterval: body.spamInterval,
+                spamDelayMin: body.spamDelayMin,
+                spamDelayMax: body.spamDelayMax,
             }
         });
 
