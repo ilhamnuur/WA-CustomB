@@ -56,9 +56,14 @@ export class WhatsAppInstance {
             syncFullHistory: true, // Enable history sync to get contacts
         });
 
-        // Apply Anti-Spam Wrapper
-        // We do this immediately after socket creation to intercept all sends
-        await antispam.wrap(this.socket, this.sessionId);
+        // Apply Anti-Spam Wrapper to sendMessage
+        // This wraps the socket's sendMessage so ALL outgoing messages go through rate limiting
+        const originalSendMessage = this.socket.sendMessage.bind(this.socket);
+        const sessionId = this.sessionId;
+        this.socket.sendMessage = async function (jid: string, content: any, options?: any) {
+            await antispam.applyDelay(sessionId);
+            return originalSendMessage(jid, content, options);
+        } as any;
 
         // Bind Store for DB Sync (handles incoming messages)
         bindSessionStore(this.socket, this.sessionId, this.io);

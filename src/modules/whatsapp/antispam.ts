@@ -1,10 +1,18 @@
-import { WASocket, AnyMessageContent, MiscMessageGenerationOptions } from "@whiskeysockets/baileys";
 import { prisma } from "@/lib/prisma";
+
+interface AntiSpamConfig {
+    antiSpamEnabled: boolean;
+    spamLimit: number;
+    spamInterval: number;
+    spamDelayMin: number;
+    spamDelayMax: number;
+}
 
 class AntiSpamManager {
     private static instance: AntiSpamManager;
     private sessionHistory: Map<string, number[]> = new Map();
     private sessionQueues: Map<string, Promise<any>> = new Map();
+    private configCache: Map<string, { config: AntiSpamConfig | null; cachedAt: number }> = new Map();
 
     private constructor() { }
 
@@ -16,76 +24,100 @@ class AntiSpamManager {
     }
 
     /**
-     * Wraps the socket.sendMessage to add Anti-Spam delays
+     * Core method: apply anti-spam delay before sending a message.
+     * Call this BEFORE every sendMessage call.
      */
-    async wrap(socket: WASocket, sessionId: string) {
-        const originalSendMessage = socket.sendMessage.bind(socket);
+    async applyDelay(sessionId: string): Promise<void> {
+        const config = await this.getAntiSpamConfig(sessionId);
 
-        socket.sendMessage = async (
-            jid: string,
-            content: AnyMessageContent,
-            options?: MiscMessageGenerationOptions
-        ) => {
-            // Get current config for this session
-            const botConfig = await this.getBotConfig(sessionId) as any;
+        if (!config || !config.antiSpamEnabled) {
+            return; // Anti-spam disabled, no delay
+        }
 
-            if (!botConfig || !botConfig.antiSpamEnabled) {
-                return originalSendMessage(jid, content, options);
+        // Ensure per-session queue exists
+        if (!this.sessionQueues.has(sessionId)) {
+            this.sessionQueues.set(sessionId, Promise.resolve());
+        }
+
+        const currentQueue = this.sessionQueues.get(sessionId)!;
+
+        const delayPromise = currentQueue.then(async () => {
+            const now = Date.now();
+            const history = this.sessionHistory.get(sessionId) || [];
+
+            // Clean up: keep only messages within the time window
+            const windowStart = now - (config.spamInterval * 1000);
+            const recentMessages = history.filter(ts => ts > windowStart);
+
+            if (recentMessages.length >= config.spamLimit) {
+                // Rate limit reached — apply random delay
+                const delay = Math.floor(
+                    Math.random() * (config.spamDelayMax - config.spamDelayMin + 1)
+                ) + config.spamDelayMin;
+
+                console.log(
+                    `[Anti-Spam] Session ${sessionId}: Rate limit hit (${recentMessages.length}/${config.spamLimit} msgs in ${config.spamInterval}s). Delaying by ${delay}ms`
+                );
+
+                await new Promise(resolve => setTimeout(resolve, delay));
             }
 
-            // Implementation of per-session queue to prevent simultaneous burst
-            // Even with individual delays, a queue ensures strict ordering and staggering
-            if (!this.sessionQueues.has(sessionId)) {
-                this.sessionQueues.set(sessionId, Promise.resolve());
-            }
+            // Record this message timestamp
+            recentMessages.push(Date.now());
+            this.sessionHistory.set(sessionId, recentMessages);
+        });
 
-            const currentQueue = this.sessionQueues.get(sessionId)!;
-
-            const nextInQueue = currentQueue.then(async () => {
-                const now = Date.now();
-                const history = this.sessionHistory.get(sessionId) || [];
-
-                // Clean up history (older than interval)
-                const windowStart = now - (botConfig.spamInterval * 1000);
-                const recentMessages = history.filter(ts => ts > windowStart);
-
-                if (recentMessages.length >= botConfig.spamLimit) {
-                    // Limit reached! Calculate random delay
-                    const delay = Math.floor(Math.random() * (botConfig.spamDelayMax - botConfig.spamDelayMin + 1)) + botConfig.spamDelayMin;
-
-                    console.log(`[Anti-Spam] Session ${sessionId}: Limit reached (${recentMessages.length}/${botConfig.spamLimit}). Delaying message by ${delay}ms...`);
-
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-
-                // Update history with the actual send time (after delay)
-                const updatedHistory = this.sessionHistory.get(sessionId) || [];
-                updatedHistory.push(Date.now());
-                // Keep history lean
-                this.sessionHistory.set(sessionId, updatedHistory.filter(ts => ts > (Date.now() - 60000))); // Keep last 1 min max
-
-                return originalSendMessage(jid, content, options);
-            });
-
-            this.sessionQueues.set(sessionId, nextInQueue.catch(() => { })); // Prevent queue breakage on error
-            return nextInQueue;
-        };
+        this.sessionQueues.set(sessionId, delayPromise.catch(() => { }));
+        await delayPromise;
     }
 
-    private async getBotConfig(sessionId: string) {
+    /**
+     * Fetch anti-spam config with 10-second cache to avoid hammering the DB.
+     */
+    private async getAntiSpamConfig(sessionId: string): Promise<AntiSpamConfig | null> {
+        const cached = this.configCache.get(sessionId);
+        if (cached && (Date.now() - cached.cachedAt) < 10000) {
+            return cached.config;
+        }
+
         try {
-            // We fetch by sessionId (the string UUID/Name used in the app)
-            // Note: In our schema BotConfig is linked to Session via ID (cuid), 
-            // but the API often uses sessionId (the human readable string).
-            const session = await prisma.session.findUnique({
-                where: { sessionId },
-                select: { id: true, botConfig: true }
-            });
-            return session?.botConfig;
+            // Use raw query to bypass Prisma client type issues
+            const results: any[] = await prisma.$queryRawUnsafe(
+                `SELECT bc.antiSpamEnabled, bc.spamLimit, bc.spamInterval, bc.spamDelayMin, bc.spamDelayMax
+                 FROM BotConfig bc
+                 INNER JOIN Session s ON s.id = bc.sessionId
+                 WHERE s.sessionId = ?`,
+                sessionId
+            );
+
+            if (results.length === 0) {
+                this.configCache.set(sessionId, { config: null, cachedAt: Date.now() });
+                return null;
+            }
+
+            const row = results[0];
+            const config: AntiSpamConfig = {
+                antiSpamEnabled: Boolean(row.antiSpamEnabled),
+                spamLimit: Number(row.spamLimit) || 5,
+                spamInterval: Number(row.spamInterval) || 10,
+                spamDelayMin: Number(row.spamDelayMin) || 1000,
+                spamDelayMax: Number(row.spamDelayMax) || 3000,
+            };
+
+            this.configCache.set(sessionId, { config, cachedAt: Date.now() });
+            return config;
         } catch (error) {
             console.error(`[Anti-Spam] Error fetching config for ${sessionId}:`, error);
+            this.configCache.set(sessionId, { config: null, cachedAt: Date.now() });
             return null;
         }
+    }
+
+    /**
+     * Clear cache for a session (call when config is updated)
+     */
+    clearCache(sessionId: string) {
+        this.configCache.delete(sessionId);
     }
 }
 
