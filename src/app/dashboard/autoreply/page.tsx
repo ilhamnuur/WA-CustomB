@@ -28,6 +28,8 @@ interface AutoReply {
     keyword: string;
     response: string;
     matchType: string;
+    isMedia: boolean;
+    mediaUrl: string | null;
 }
 
 export default function AutoReplyPage() {
@@ -42,6 +44,9 @@ export default function AutoReplyPage() {
     const [newKeyword, setNewKeyword] = useState("");
     const [newResponse, setNewResponse] = useState("");
     const [newMatchType, setNewMatchType] = useState("EXACT");
+    const [newIsMedia, setNewIsMedia] = useState(false);
+    const [newMediaUrl, setNewMediaUrl] = useState("");
+    const [newTriggerType, setNewTriggerType] = useState("ALL");
 
     // Delete state
     const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -65,7 +70,7 @@ export default function AutoReplyPage() {
             const res = await fetch(`/api/autoreplies/${sessionId}`);
             if (res.ok) {
                 const data = await res.json();
-                setRules(data);
+                setRules(data?.data || []);
             } else {
                 setRules([]); // or error
             }
@@ -82,6 +87,9 @@ export default function AutoReplyPage() {
         setNewKeyword(rule.keyword);
         setNewResponse(rule.response);
         setNewMatchType(rule.matchType);
+        setNewIsMedia(rule.isMedia || false);
+        setNewMediaUrl(rule.mediaUrl || "");
+        setNewTriggerType((rule as any).triggerType || "ALL");
         setShowForm(true);
     };
 
@@ -101,7 +109,10 @@ export default function AutoReplyPage() {
                 body: JSON.stringify({
                     keyword: newKeyword,
                     response: newResponse,
-                    matchType: newMatchType
+                    matchType: newMatchType,
+                    isMedia: newIsMedia,
+                    mediaUrl: newMediaUrl,
+                    triggerType: newTriggerType // Added triggerType
                 })
             });
 
@@ -111,6 +122,9 @@ export default function AutoReplyPage() {
                 setNewKeyword("");
                 setNewResponse("");
                 setNewMatchType("EXACT");
+                setNewIsMedia(false);
+                setNewMediaUrl("");
+                setNewTriggerType("ALL"); // Reset newTriggerType
                 setEditingId(null);
                 fetchRules(selectedSessionId);
             } else {
@@ -146,27 +160,30 @@ export default function AutoReplyPage() {
     return (
         <SessionGuard>
             <div className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold flex items-center gap-2">
-                            <MessageSquare className="h-6 w-6" /> Auto Reply
+                        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6" /> Auto Reply
                         </h1>
-                        <p className="text-muted-foreground">Automatically reply to incoming messages based on keywords.</p>
+                        <p className="text-sm text-muted-foreground">Automatically reply to incoming messages based on keywords.</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={() => selectedSessionId && fetchRules(selectedSessionId)} disabled={loading || !selectedSessionId}>
-                            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => selectedSessionId && fetchRules(selectedSessionId)} disabled={loading || !selectedSessionId}>
+                            <RefreshCw className={`h-4 w-4 mr-1 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
                             Refresh
                         </Button>
-                        <Button onClick={() => {
+                        <Button size="sm" className="flex-1 sm:flex-none" onClick={() => {
                             setEditingId(null);
                             setNewKeyword("");
                             setNewResponse("");
                             setNewMatchType("EXACT");
+                            setNewIsMedia(false);
+                            setNewMediaUrl("");
+                            setNewTriggerType("ALL");
                             setShowForm(!showForm);
                         }} disabled={!selectedSessionId}>
-                            <Plus className="h-4 w-4 mr-2" /> Add Rule
+                            <Plus className="h-4 w-4 mr-1 sm:mr-2" /> Add Rule
                         </Button>
                     </div>
                 </div>
@@ -183,15 +200,15 @@ export default function AutoReplyPage() {
                             <CardTitle>{editingId ? "Edit Auto Reply Rule" : "New Auto Reply Rule"}</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Keyword</Label>
-                                    <Input
-                                        value={newKeyword}
-                                        onChange={e => setNewKeyword(e.target.value)}
-                                        placeholder="e.g. !hello"
-                                    />
-                                </div>
+                            <div className="space-y-2">
+                                <Label>Keyword</Label>
+                                <Input
+                                    value={newKeyword}
+                                    onChange={e => setNewKeyword(e.target.value)}
+                                    placeholder="e.g. !hello"
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                 <div className="space-y-2">
                                     <Label>Match Type</Label>
                                     <Select value={newMatchType} onValueChange={setNewMatchType}>
@@ -201,10 +218,49 @@ export default function AutoReplyPage() {
                                         <SelectContent>
                                             <SelectItem value="EXACT">Exact Match</SelectItem>
                                             <SelectItem value="CONTAINS">Contains</SelectItem>
+                                            <SelectItem value="STARTS_WITH">Starts With</SelectItem>
                                             <SelectItem value="REGEX">Regex</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                <div className="space-y-2">
+                                    <Label>Respond IN</Label>
+                                    <Select value={newTriggerType} onValueChange={setNewTriggerType}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ALL">All Chats</SelectItem>
+                                            <SelectItem value="PRIVATE">Private Only</SelectItem>
+                                            <SelectItem value="GROUP">Group Only</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 border p-3 rounded-md">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="isMedia"
+                                        className="h-4 w-4 rounded border-gray-300"
+                                        checked={newIsMedia}
+                                        onChange={(e) => setNewIsMedia(e.target.checked)}
+                                    />
+                                    <Label htmlFor="isMedia">Send Media</Label>
+                                </div>
+
+                                {newIsMedia && (
+                                    <div className="space-y-2">
+                                        <Label>Media URL</Label>
+                                        <Input
+                                            placeholder="https://example.com/image.jpg"
+                                            value={newMediaUrl}
+                                            onChange={(e) => setNewMediaUrl(e.target.value)}
+                                        />
+                                        <p className="text-xs text-muted-foreground">Direct link to image, video, or document.</p>
+                                    </div>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label>Response Message</Label>
@@ -221,6 +277,8 @@ export default function AutoReplyPage() {
                                     setEditingId(null);
                                     setNewKeyword("");
                                     setNewResponse("");
+                                    setNewIsMedia(false);
+                                    setNewMediaUrl("");
                                 }}>Cancel</Button>
                                 <Button onClick={handleSaveRule}>{editingId ? "Update" : "Save"}</Button>
                             </div>
@@ -239,7 +297,7 @@ export default function AutoReplyPage() {
                     <div className="grid gap-4">
                         {filteredRules.map(rule => (
                             <Card key={rule.id}>
-                                <CardContent className="flex justify-between items-center p-4">
+                                <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-3 sm:p-4">
                                     <div>
                                         <div className="font-bold flex items-center gap-2">
                                             {rule.keyword}

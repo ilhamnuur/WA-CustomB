@@ -1,3 +1,122 @@
+## [v1.5.0] - 2026-02-26
+
+### Added
+- **Collapsible Sidebar**:
+    - Desktop sidebar can now be minimized to icon-only mode (260px ↔ 72px).
+    - Tooltips on each menu item when collapsed for quick identification.
+    - Collapse state persisted in `localStorage` across page navigations.
+    - Smooth CSS transitions on width, brand logo, and user footer.
+    - New `SidebarProvider` context and `SidebarShell` client component architecture.
+- **Chat UI Overhaul**:
+    - **Search Bar**: Filter chats by name or phone number in real-time.
+    - **WhatsApp-style List**: Borderless items with hover states, left accent on selected chat.
+    - **Smart Previews**: Message preview up to 45 characters, media type icons (📎 Image, Video, etc.).
+    - **Relative Time Labels**: Shows "Yesterday", "Mon", "Feb 12" instead of raw timestamps.
+    - **Date Separators**: "Today", "Yesterday", or full date between message groups.
+    - **Rounded Bubbles**: WhatsApp-style message bubbles with tail shape and inline timestamps.
+    - **Dotted Background**: Subtle dot pattern in chat window for visual depth.
+    - **Mobile Back Button**: Integrated back button in chat header for mobile navigation.
+    - **Colored Attachment Menu**: Each media type has a distinct color icon.
+- **Media Management Page** (`/dashboard/media`):
+    - Per-user access control — users only see media from their own sessions.
+    - Grouped view: files organized by **Session** → **Sender/From** (collapsible sections).
+    - Sender info enriched from database (pushName, senderJid via batch keyId lookup).
+    - Stats cards: total storage size, file count, images, and media breakdown.
+    - Search and filter by type, filename, session, or sender name.
+    - Grid view with image thumbnails and file metadata.
+    - Multi-select and bulk delete with per-group "Select All".
+    - Full-screen image preview modal.
+    - SUPERADMIN sees all sessions' media; other users see only their own.
+- **Media Security API**:
+    - `GET /api/media` — List media files with sender metadata, filtered by session ownership.
+    - `GET /api/media/[filename]` — Serve media with session ownership check.
+    - `DELETE /api/media` — Bulk delete with per-file session ownership verification.
+- **Shared JID Utilities**: New `src/lib/jid-utils.ts` module with `resolveToPhoneJid()`, `batchResolveToPhoneJid()`, and `isLidJid()` for consistent JID handling across the entire codebase.
+- **Tooltip UI Component**: Added `@radix-ui/react-tooltip` dependency and `src/components/ui/tooltip.tsx`.
+
+### Security
+- **Media Storage Hardened**: Moved media files from `public/media/` (publicly accessible) to `data/media/` (private, requires authentication to access via API).
+- **Middleware Bypass Fixed**: Removed dangerous `pathname.startsWith("/media")` and `pathname.includes(".")` rules that allowed unauthenticated access to media files and any URL containing a dot.
+- **Media API Secured**: `GET /api/media/[filename]` now requires `getAuthenticatedUser()` (session or API key). Added `path.resolve()` check to prevent directory traversal attacks.
+- **Media Session Ownership**: All media endpoints enforce `canAccessSession()` — users can only view, serve, and delete media belonging to their own sessions.
+- **Security Headers**: Added `X-Content-Type-Options: nosniff` and `Cache-Control: private` to media responses.
+- **Default Catch-All**: Middleware now requires authentication for all unmatched routes instead of passing through.
+
+### Fixed
+- **Media Sender Collision**: Fixed an issue where WhatsApp `keyId` collisions across different sessions caused media files to be grouped under the wrong sender ("Unknown"). The grouping API now requires an exact match on both `sessionId` and `keyId`.
+- **Media Grouping UI**: Cleaned up the 3-level media grouping UI (User > Session > Sender) to use distinct cards with better padding and clear visual hierarchy, replacing the messy nested indents.
+- **JID Consistency (Webhooks)**: Webhook payloads (`from`, `sender`, `participant`) now always use `@s.whatsapp.net` format instead of `@lid`. Uses a three-tier resolution: inline `remoteJidAlt` → DB Contact lookup → fallback.
+- **JID Consistency (Web UI)**: Chat list API now batch-resolves `@lid` JIDs to phone numbers before responding, ensuring the UI always displays `@s.whatsapp.net` format.
+- **JID Consistency (Message Store)**: `processAndSaveMessage` now normalizes `remoteJid` and `senderJid` before writing to the database, preventing `@lid` from being stored.
+- **Chat List Overflow**: Fixed long text in chat list items expanding horizontally; now properly truncated with ellipsis.
+- **Session Path Parameter**: Renamed API route folder from `sessions/[id]` to `sessions/[sessionId]` for consistency with all other endpoints. Updated all 5 route handlers and API docs page.
+
+### Changed
+- **Dashboard Layout**: Lighter ambient background gradients, tighter padding on mobile (`p-3`), cleaner overall feel.
+- **Webhook Refactor**: Removed duplicated `resolveToPhoneJid` and `isLidJid` from `webhook.ts` — now imports from shared `jid-utils.ts`.
+- **API Docs Page**: Session endpoints now correctly show `[sessionId]` instead of `[id]` in path and parameter descriptions.
+
+---
+
+## [v1.4.1] - 2026-02-21
+
+### Added
+- **Registration Toggle**: Super Admins can now enable or disable new user registrations directly from the dashboard settings.
+- **Dynamic Auth UI**: Login and Register pages now reflect the live registration status, gracefully hiding forms or links when registration is disabled by an administrator.
+
+### Changed
+- Registration API now respects the global `enableRegistration` setting flag.
+
+## [v1.4.0] - 2026-02-21
+
+### Added
+- **Dashboard UI Overhaul**:
+    - **Grouped Sidebar Navigation**: Organizes features into logical sections (Messaging, Contacts, Automation, Developer, Administration).
+    - **Active Link Highlighting**: Sidebar now correctly highlights the current active page.
+    - **Collapsible Groups**: Sidebar sections can now be collapsed/expanded for a cleaner workspace.
+    - **Revamped Home Page**: Features 4 summary stat cards, a quick-actions grid, and improved session status cards with colored indicators.
+    - **Modernized Layout**: Added backdrop-blur to the navbar, refined spacing, and updated all loading skeletons.
+- **Star/Unstar Message**: `POST /api/messages/{sessionId}/{jid}/{messageId}/star` to star or unstar messages.
+- **Message Search**: `GET /api/messages/{sessionId}/search` with full-text search, JID/type/sender filters, and pagination.
+
+### Fixed
+- **WhatsApp Web Group Replies**: Fixed an issue where quoted replies in group chats were silently dropped by WhatsApp Web's UI.
+    - Resolved user-facing `sessionId` directly to the db CUID to ensure robust database lookups for the original message.
+    - Mapped Linked Device IDs (`@lid`) back to standard phone number JIDs (`@s.whatsapp.net`) via the `Contact` table.
+    - Enforced strict WA Web quote validation by perfectly mirroring the original message's `fromMe`, `messageTimestamp`, and `pushName`.
+    - Always structured text quotes as `extendedTextMessage`.
+- **API Consistency**: Refactored reply endpoints (`/api/messages/[sessionId]/[jid]/[messageId]/reply` and `/api/messages/[sessionId]/[jid]/reply`) to use the same `{ message: { text: ... }, mentions: [] }` format as the `/send` endpoint.
+- **Auto Reply Bug**: Fixed `matchType` default in PUT endpoint — was `"exact"` (lowercase) but handler expects `"EXACT"` (uppercase), causing updated rules to silently stop matching.
+- **Contacts Block/Unblock**: Added missing `decodeURIComponent(jid)` — JIDs with `%40` encoding were not being decoded.
+- **Contacts GET Auth**: Replaced `auth()` with `getAuthenticatedUser()` + `canAccessSession()` to enable API key authentication and session-level access control.
+- **Infrastructure**: Fixed Prisma binary target issues for better environment compatibility.
+
+### Changed
+- **Consistency**: Standardized `403` error messages to `"Forbidden - Cannot access this session"` across 11 route files.
+- **Consistency**: Standardized validation order (auth → params → body) across all routes.
+- **Cleanup**: Removed duplicate `messages/[jid]/read` route (use `chat/[jid]/read` instead).
+- **Styling**: Switched sidebar from a shadow-based design to a more modern border-based aesthetic.
+
+## [v1.3.0] - 2026-02-01
+
+### Added
+- **Granular Access Control**:
+    - Introduced `BLACKLIST` mode for both Bot Commands and Auto Replies.
+    - Added `botBlockedJids` and `autoReplyBlockedJids` to `BotConfig`.
+    - Updated Dashboard "Bot Settings" to configure Blocked/Allowed JIDs visually.
+- **Advanced Auto Reply Features**:
+    - **Context Awareness**: Auto replies can now be scoped to `ALL`, `GROUP`, or `PRIVATE` chats via `triggerType`.
+    - **Media Support**: Auto replies can now include media attachments (Images, Videos, Documents) via `mediaUrl` and `isMedia`.
+- **Scheduler Enhancements**:
+    - **Media Support**: Scheduled messages now support `image`, `video`, and `document` types.
+    - **Smart JID Helpers**: Added UI dropdown to easily select recipient type (`@s.whatsapp.net`, `@g.us`, `@newsletter`).
+- **Documentation**:
+    - Comprehensive audit of `src/lib/swagger.ts` with complete examples for all endpoints.
+    - Updated `USER_GUIDE.md` and `README.md` with new feature instructions.
+
+### Fixed
+- **Type Safety**: Resolved Prisma type definition conflicts in Auto Reply API route.
+- **Stability**: Improvements to context-based message filtering logic.
 
 ## [v1.2.0] - 2026-01-18
 

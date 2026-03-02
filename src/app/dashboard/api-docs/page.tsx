@@ -21,13 +21,13 @@ export default function ApiDocsPage() {
         // Sessions
         { category: "Sessions", method: "GET", path: "/api/sessions", description: "List all sessions", params: "-" },
         { category: "Sessions", method: "POST", path: "/api/sessions", description: "Create new session", params: "Body: { name, sessionId }" },
-        { category: "Sessions", method: "GET", path: "/api/sessions/[id]", description: "Get session details", params: "Path: id" },
-        { category: "Sessions", method: "GET", path: "/api/sessions/[id]/qr", description: "Get QR code", params: "Path: id" },
-        { category: "Sessions", method: "GET", path: "/api/sessions/[id]/bot-config", description: "Get bot config", params: "Path: id" },
-        { category: "Sessions", method: "POST", path: "/api/sessions/[id]/bot-config", description: "Update bot config", params: "Path: id, Body: { enabled, botMode, ... }" },
-        { category: "Sessions", method: "PATCH", path: "/api/sessions/[id]/settings", description: "Update settings", params: "Path: id, Body: { config }" },
-        { category: "Sessions", method: "DELETE", path: "/api/sessions/[id]/settings", description: "Delete session", params: "Path: id" },
-        { category: "Sessions", method: "POST", path: "/api/sessions/[id]/[action]", description: "Control session", params: "Path: id, action (start|stop|restart|logout)" },
+        { category: "Sessions", method: "GET", path: "/api/sessions/[sessionId]", description: "Get session details", params: "Path: sessionId" },
+        { category: "Sessions", method: "GET", path: "/api/sessions/[sessionId]/qr", description: "Get QR code", params: "Path: sessionId" },
+        { category: "Sessions", method: "GET", path: "/api/sessions/[sessionId]/bot-config", description: "Get bot config", params: "Path: sessionId" },
+        { category: "Sessions", method: "POST", path: "/api/sessions/[sessionId]/bot-config", description: "Update bot config", params: "Path: sessionId, Body: { enabled, botMode, ... }" },
+        { category: "Sessions", method: "PATCH", path: "/api/sessions/[sessionId]/settings", description: "Update settings", params: "Path: sessionId, Body: { config }" },
+        { category: "Sessions", method: "DELETE", path: "/api/sessions/[sessionId]/settings", description: "Delete session", params: "Path: sessionId" },
+        { category: "Sessions", method: "POST", path: "/api/sessions/[sessionId]/[action]", description: "Control session", params: "Path: sessionId, action (start|stop|restart|logout)" },
 
         // Groups
         { category: "Groups", method: "GET", path: "/api/groups/[sessionId]", description: "List groups", params: "Path: sessionId" },
@@ -224,13 +224,13 @@ export default function ApiDocsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-gray-50 p-3 sm:p-6">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                            <FileText className="w-8 h-8 text-blue-600" />
+                        <h1 className="text-xl sm:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                            <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
                             API Documentation
                         </h1>
                         <p className="text-gray-500 mt-2">
