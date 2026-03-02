@@ -1,3 +1,32 @@
+## [v1.5.1-beta.2] - 2026-03-02
+
+### Added
+- **Global System Resource Monitoring**:
+    - New Dashboard page (`/dashboard/system-monitor`) for Superadmins to monitor host server health.
+    - Real-time CPU Load (Total & Per-Core breakdown).
+    - System RAM vs Node.js Process Memory (Heap/RSS) tracking.
+    - Network Traffic monitoring (Live RX/TX bytes per second).
+    - Disk Usage tracking for all mounted partitions.
+    - Automatic 3-second polling for live updates.
+- **Per-Session Health Monitoring**:
+    - Integrated real-time metrics into the Session Detail page.
+    - **Connection Ping**: Monitors Baileys socket state and latency.
+    - **Session Uptime**: Displays exactly how long the session has been connected.
+    - **Message Store Stats**: Placeholders for tracking in-memory Baileys store (Contacts, Chats, Messages).
+- **Administration Features**:
+    - Added "System Monitor" link to the sidebar navigation (restricted to SUPERADMIN).
+
+### Fixed
+- **Next.js 15 Compatibility**: Fixed TypeScript errors related to `Promise`-wrapped `params` in dynamic API routes.
+- **Auth Logic**: Standardized backend auth to use `@/lib/api-auth` across all new monitoring endpoints.
+- **Socket Reliability**: Improved socket state detection for `CONNECTED` sessions by accessing the underlying `ws.readyState`.
+
+### Technical
+- **New Dependencies**: Added `systeminformation` for OS metrics and `@radix-ui/react-progress` for UI components.
+- **UI Components**: Manually implemented `src/components/ui/progress.tsx` due to environment-specific CLI issues.
+
+---
+
 ## [v1.5.1-beta.1] - 2026-03-02
 
 ### Added
