@@ -1,3 +1,45 @@
+## [v1.5.1] - 2026-03-03
+
+### Added
+- **WA-AKG API Heartbeat Monitoring**: 
+    - Full transition to a dual-app architecture with a standalone `wa-akg-api` monitoring system.
+    - Automated background heartbeat system in the main app to detect active server instances.
+    - Persistent MySQL/MariaDB storage for monitoring data with premium dark-mode dashboard.
+- **Global System Resource Monitoring**:
+    - Centralized "System Monitor" dashboard for Superadmins to track CPU (Live & Per-core), RAM, Disk, and Network health.
+    - Detailed process-level memory tracking (Heap/RSS) for the Node.js application.
+- **Per-Session Health Monitoring**: 
+    - Live Baileys socket ping/latency and connection uptime integrated directly into Session Detail pages.
+- **Anti-Ban Protection (Anti-Spam Rate Limit)**:
+    - High-performance message queue system to prevent WhatsApp account bans.
+    - Configurable per-session thresholds, randomized delays, and FIFO message sequence management.
+- **Improved Administration UI**:
+    - Added security warnings on login/dashboard if Public Registration is enabled.
+    - Sidebar navigation overhaul for better feature grouping (Messaging, Automation, Administration).
+    - New dashboard controls for Command Prefix and Max Sticker Duration.
+- **WhatsApp Pairing Code Connection**:
+    - Support for linking WhatsApp accounts via 8-character pairing codes as an alternative to QR scanning.
+    - Integrated "Link with Phone Number" UI in Session Detail page with one-click copy support.
+    - Optimized browser identification for maximum compatibility with WhatsApp's pairing system.
+- **Message View & Media Download**:
+    - Fixed individual chat message visibility issues by standardizing API response structures.
+    - Added one-click Media Download buttons for Image, Video, Audio, and Document messages in the Chat Window.
+- **Standardization**: RESTful API path parameter standardization using `[sessionId]` and a consistent `{ status, message, data }` response format.
+
+### Changed
+- **SEO & Accessibility**: Introduced `NEXT_PUBLIC_ALLOW_INDEXING` toggle to control global search engine crawling (Default: noindex).
+- **Alert System Overhaul**: Replaced intrusive browser `alert()` and `confirm()` calls with modern Sonner Toasts and Radix UI dialogs.
+- **Mobile-First Responsiveness**: Comprehensive design update for 12+ dashboard pages to ensure flawless mobile viewing (tabs, headers, and grids).
+- **Socket Reliability**: Refactored socket status detection for always-accurate "CONNECTED" reporting via readyState investigation.
+
+### Fixed
+- **Next.js 15 Compatibility**: Resolved critical TypeScript errors with Promise-wrapped route params.
+- **JID Normalization**: Standardized mapping of `@lid` (Linked Device) to phone `@s.whatsapp.net` across Webhooks, Store, and UI.
+- **JID Encoding**: Fixed 404 router errors caused by unencoded `@` symbols in API documentation examples.
+- **Anti-Spam Stability**: Fixed socket wrapper preservation during session re-initialization.
+
+---
+
 ## [v1.5.1-beta.3] - 2026-03-03
 
 ### Changed
