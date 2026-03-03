@@ -1,3 +1,12 @@
+## [v1.5.1-beta.3] - 2026-03-03
+
+### Changed
+- **SEO Accessibility**: Introduced `NEXT_PUBLIC_ALLOW_INDEXING` setting handling global HTML page bots indexing (Default: noindex/nofollow).
+- **Admin Dashboard Layout**: Added proactive visual warnings on Dashboard entry for Superadmins alerting when Public Registration is globally enabled to safeguard deployment environments.
+- **Improved Auth Consistency**: Standardized RESTful authentication validation, blocking users from listing user data or inspecting elements belonging to unowned session IDs via endpoints like `/api/contacts/route`.
+
+---
+
 ## [v1.5.1-beta.2] - 2026-03-02
 
 ### Added
