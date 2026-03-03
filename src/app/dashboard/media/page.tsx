@@ -219,6 +219,21 @@ export default function MediaPage() {
         return result;
     }, [filteredFiles]);
 
+    // Collapse all by default when grouped dependencies change (e.g on initial load or search)
+    useEffect(() => {
+        const allKeys = new Set<string>();
+        grouped.forEach(userGroup => {
+            allKeys.add(`user:${userGroup.ownerId}`);
+            userGroup.sessions.forEach(sessionGroup => {
+                allKeys.add(`session:${userGroup.ownerId}:${sessionGroup.sessionId}`);
+                sessionGroup.senders.forEach(sender => {
+                    allKeys.add(`sender:${userGroup.ownerId}:${sessionGroup.sessionId}:${sender.senderKey}`);
+                });
+            });
+        });
+        setCollapsed(allKeys);
+    }, [grouped]);
+
     const toggleCollapse = (key: string) => {
         setCollapsed(prev => {
             const next = new Set(prev);

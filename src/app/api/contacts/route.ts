@@ -1,11 +1,10 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
 
 export async function GET(req: NextRequest) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ status: false, message: "Unauthorized", error: "Unauthorized" }, { status: 401 });
+    const user = await getAuthenticatedUser(req);
+    if (!user) return NextResponse.json({ status: false, message: "Unauthorized", error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
     const sessionIdParam = searchParams.get("sessionId");
@@ -20,6 +19,12 @@ export async function GET(req: NextRequest) {
 
     if (!sessionIdParam) {
         return NextResponse.json({ status: false, message: "Session ID is required", error: "Session ID is required" }, { status: 400 });
+    }
+
+    // Verify access
+    const canAccess = await canAccessSession(user.id, user.role, sessionIdParam);
+    if (!canAccess) {
+        return NextResponse.json({ status: false, message: "Forbidden - Cannot access this session", error: "Forbidden - Cannot access this session" }, { status: 403 });
     }
 
     // Resolve sessionId string to database ID (CUID)
