@@ -23,6 +23,10 @@ import {
     Megaphone,
     HardDrive,
     Activity,
+    UserCircle,
+    Tag,
+    MessageCircleReply,
+    Contact
 } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import {
@@ -50,6 +54,7 @@ const navGroups: NavGroup[] = [
         label: "Main",
         items: [
             { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+            { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode },
         ],
     },
     {
@@ -72,6 +77,8 @@ const navGroups: NavGroup[] = [
         label: "Automation",
         items: [
             { href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot },
+            { href: "/dashboard/autoreply", label: "Auto Reply", icon: MessageCircleReply },
+            { href: "/dashboard/profile", label: "Bot Profile", icon: UserCircle },
             { href: "/dashboard/scheduler", label: "Scheduler", icon: CalendarClock },
             { href: "/dashboard/webhooks", label: "Webhooks & API", icon: Webhook },
         ],
@@ -84,9 +91,17 @@ const navGroups: NavGroup[] = [
         ],
     },
     {
+        label: "WhatsApp Features",
+        items: [
+            { href: "/dashboard/contacts", label: "Contacts", icon: Contact },
+            { href: "/dashboard/groups", label: "Groups", icon: Users },
+            { href: "/dashboard/broadcasts", label: "Broadcasts", icon: Megaphone },
+            { href: "/dashboard/labels", label: "Labels", icon: Tag },
+        ],
+    },
+    {
         label: "Administration",
         items: [
-            { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode },
             { href: "/dashboard/media", label: "Media Manager", icon: HardDrive },
             { href: "/dashboard/users", label: "Users", icon: Users },
             { href: "/dashboard/settings", label: "Settings", icon: Settings },

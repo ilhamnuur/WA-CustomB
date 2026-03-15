@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { cn } from "@/lib/utils";
 import { io } from "socket.io-client";
+import { getChatsStatus } from "@/app/dashboard/chat/actions";
 
 interface ChatContact {
     jid: string;
@@ -39,22 +40,19 @@ export function ChatList({ sessionId, onSelectChat, selectedJid }: ChatListProps
     useEffect(() => {
         const fetchChats = async () => {
             try {
-                const res = await fetch(`/api/chat/${sessionId}`);
-                if (res.ok) {
-                    const responseData = await res.json();
-                    const rawChats = responseData?.data || [];
-                    // Deduplicate by JID - keep the one with the latest message
-                    const chatMap = new Map<string, ChatContact>();
-                    rawChats.forEach((c: ChatContact) => {
-                        const existing = chatMap.get(c.jid);
-                        if (!existing || (c.lastMessage?.timestamp && (!existing.lastMessage?.timestamp || new Date(c.lastMessage.timestamp) > new Date(existing.lastMessage.timestamp)))) {
-                            chatMap.set(c.jid, c);
-                        }
-                    });
-                    setChats(Array.from(chatMap.values()));
-                }
+                const rawChats = await getChatsStatus(sessionId);
+                
+                // Deduplicate by JID - keep the one with the latest message
+                const chatMap = new Map<string, ChatContact>();
+                rawChats.forEach((c: any) => {
+                    const existing = chatMap.get(c.jid);
+                    if (!existing || (c.lastMessage?.timestamp && (!existing.lastMessage?.timestamp || new Date(c.lastMessage.timestamp) > new Date(existing.lastMessage.timestamp)))) {
+                        chatMap.set(c.jid, c);
+                    }
+                });
+                setChats(Array.from(chatMap.values()));
             } catch (error) {
-                console.error("Failed to load chats", error);
+                console.error("Failed to load chats via Server Action", error);
             } finally {
                 setLoading(false);
             }
