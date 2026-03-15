@@ -92,7 +92,8 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
         try {
             await sendChatMessage(sessionId, jid, newMessage);
             setNewMessage("");
-            fetchMessages(); // refresh the list (also updated via socket, but just in case)
+            // Give Baileys time to fire messages.upsert and save to DB
+            setTimeout(() => fetchMessages(), 800);
         } catch (e: any) {
             console.error(e);
             toast.error(e.message || "Failed to send message");
@@ -114,7 +115,7 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
             toast.info("Sending...");
             await sendMediaMessage(formData);
             toast.success("Sent!");
-            fetchMessages(); // Refresh chat after sending media
+            setTimeout(() => fetchMessages(), 800); // Delay to allow Baileys to save
         } catch (error: any) {
             console.error(error);
             toast.error(error.message || "Failed to send media");
