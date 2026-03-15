@@ -3,7 +3,7 @@ import type { WASocket, WAMessage, Contact } from "@whiskeysockets/baileys";
 import { normalizeMessageContent } from "@whiskeysockets/baileys";
 import { onMessageReceived, onMessageSent, dispatchWebhook, downloadAndSaveMedia } from "@/lib/webhook";
 import { handleBotCommand, setSessionStartTime } from "../bot/command-handler";
-import { resolveToPhoneJid, isLidJid } from "@/lib/jid-utils";
+import { resolveToPhoneJid, isLidJid, normalizeJid } from "@/lib/jid-utils";
 
 import { Server } from "socket.io";
 
@@ -79,6 +79,7 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
 
         // Emit to socket room for real-time frontend updates
         if (processedMessages.length > 0) {
+            console.log(`[Socket] Emitting message.update for ${processedMessages.length} messages in session ${sessionId}`);
             io?.to(sessionId).emit('message.update', processedMessages);
         }
     });
@@ -318,7 +319,7 @@ async function processAndSaveMessage(
     const newMessage = await prisma.message.create({
         data: {
             sessionId: dbSessionId,
-            remoteJid: normalizedRemoteJid,
+            remoteJid: normalizeJid(normalizedRemoteJid),
             senderJid,
             fromMe: fromMe || false,
             keyId,

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { batchResolveToPhoneJid } from "@/lib/jid-utils";
+import { batchResolveToPhoneJid, normalizeJid } from "@/lib/jid-utils";
 import { waManager } from "@/modules/whatsapp/manager";
 import Sticker from "wa-sticker-formatter";
 
@@ -33,7 +33,8 @@ export class ChatService {
         const contactMap = new Map(contacts.map(c => [c.jid, c]));
 
         const chatList = await Promise.all(Array.from(allJids).map(async (originalJid) => {
-            const normalizedJid = jidMap.get(originalJid) || originalJid;
+            const resolvedJid = jidMap.get(originalJid) || originalJid;
+            const normalizedJid = normalizeJid(resolvedJid);
             const contactInfo = contactMap.get(originalJid) || contactMap.get(normalizedJid) || { jid: normalizedJid, name: null, notify: null, profilePic: null };
 
             const lastMessage = await prisma.message.findFirst({

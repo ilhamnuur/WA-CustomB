@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,9 @@ export function ChatList({ sessionId, onSelectChat, selectedJid }: ChatListProps
     const [searchQuery, setSearchQuery] = useState("");
     const [isNewChatOpen, setIsNewChatOpen] = useState(false);
     const [newChatNumber, setNewChatNumber] = useState("");
+    
+    // Track JIDs in a ref for reliable real-time updates without depending on state closure
+    const jidsInList = useRef<Set<string>>(new Set());
 
     const fetchChats = async () => {
         try {
@@ -58,64 +61,71 @@ export function ChatList({ sessionId, onSelectChat, selectedJid }: ChatListProps
     };
 
     useEffect(() => {
-        if (!sessionId) return;
+        if (sessionId) {
+            fetchChats();
 
-        fetchChats();
-
-        const socket = io({
-            path: "/api/socket/io",
-            addTrailingSlash: false,
-        });
-
-        socket.on("connect", () => {
-            socket.emit("join-session", sessionId);
-        });
-
-        socket.on("message.update", (newMessages: any[]) => {
-            let shouldFetchAll = false;
-
-            setChats((prevChats) => {
-                const updatedChats = [...prevChats];
-                let needsReorder = false;
-
-                newMessages.forEach(msg => {
-                    const chatIndex = updatedChats.findIndex(c => c.jid === msg.remoteJid);
-                    if (chatIndex !== -1) {
-                        updatedChats[chatIndex] = {
-                            ...updatedChats[chatIndex],
-                            lastMessage: {
-                                content: msg.content,
-                                timestamp: msg.timestamp,
-                                type: msg.type
-                            }
-                        };
-                        needsReorder = true;
-                    } else {
-                        // Message from a JID not in our current list
-                        shouldFetchAll = true;
-                    }
-                });
-
-                if (needsReorder) {
-                    updatedChats.sort((a, b) => {
-                        const tA = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
-                        const tB = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
-                        return tB - tA;
-                    });
-                }
-
-                return updatedChats;
+            const socket = io({
+                path: "/api/socket/io",
+                addTrailingSlash: false,
             });
 
-            if (shouldFetchAll) {
-                fetchChats();
-            }
-        });
+            socket.on("connect", () => {
+                socket.emit("join-session", sessionId);
+            });
 
-        return () => {
-            socket.disconnect();
-        };
+            socket.on("message.update", async (newMessages: any[]) => {
+                let shouldFetchAll = false;
+
+                setChats((prevChats) => {
+                    const updatedChats = [...prevChats];
+                    let needsReorder = false;
+
+                    newMessages.forEach(msg => {
+                        const messageJid = msg.remoteJid;
+                        const chatIndex = updatedChats.findIndex(c => c.jid === messageJid);
+                        
+                        if (chatIndex !== -1) {
+                            updatedChats[chatIndex] = {
+                                ...updatedChats[chatIndex],
+                                lastMessage: {
+                                    content: msg.content,
+                                    timestamp: msg.timestamp,
+                                    type: msg.type
+                                }
+                            };
+                            needsReorder = true;
+                        } else if (!jidsInList.current.has(messageJid)) {
+                            // Message from a JID not in our current list
+                            shouldFetchAll = true;
+                        }
+                    });
+
+                    if (needsReorder) {
+                        updatedChats.sort((a, b) => {
+                            const tA = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+                            const tB = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+                            return tB - tA;
+                        });
+                    }
+
+                    return updatedChats;
+                });
+
+                if (shouldFetchAll) {
+                    await fetchChats();
+                }
+            });
+
+            return () => {
+                socket.disconnect();
+            };
+        }
     }, [sessionId]);
+
+    // Update the JID tracking ref whenever the chats list changes
+    useEffect(() => {
+        jidsInList.current = new Set(chats.map(c => c.jid));
+    }, [chats]);
 
     // Filter chats based on search query
     const filteredChats = useMemo(() => {
