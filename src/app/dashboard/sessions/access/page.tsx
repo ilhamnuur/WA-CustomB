@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,8 +45,10 @@ interface AccessEntry {
 
 export default function SessionAccessPage() {
     const { data: authSession } = useSession();
+    const searchParams = useSearchParams();
+    const sessionFromUrl = searchParams.get("session") || "";
     const [sessions, setSessions] = useState<SessionInfo[]>([]);
-    const [selectedSession, setSelectedSession] = useState<string>("");
+    const [selectedSession, setSelectedSession] = useState<string>(sessionFromUrl);
     const [accessList, setAccessList] = useState<AccessEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [accessLoading, setAccessLoading] = useState(false);
@@ -57,11 +60,15 @@ export default function SessionAccessPage() {
 
     // @ts-ignore
     const currentUserId = authSession?.user?.id;
+    // @ts-ignore
+    const currentUserRole = authSession?.user?.role;
 
-    // Fetch user's owned sessions
+    // Fetch user's owned sessions — wait for authSession to be ready
     useEffect(() => {
+        if (!authSession?.user) return; // Wait until session is loaded
         fetchSessions();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [authSession?.user]);
 
     const fetchSessions = async () => {
         try {
@@ -71,9 +78,7 @@ export default function SessionAccessPage() {
                 const allSessions: SessionInfo[] = data?.data || [];
                 // Filter to show only sessions owned by the current user (not shared ones)
                 // SUPERADMIN sees all sessions
-                // @ts-ignore
-                const userRole = authSession?.user?.role;
-                const owned = userRole === "SUPERADMIN"
+                const owned = currentUserRole === "SUPERADMIN"
                     ? allSessions
                     : allSessions.filter((s: SessionInfo) => s.userId === currentUserId);
                 setSessions(owned);
