@@ -1,3 +1,15 @@
+## [v1.5.2.1] - 2026-03-22
+
+### Fixed
+- **Mobile Sidebar Navigation Out of Sync**:
+    - Synced mobile sidebar (`mobile-nav.tsx`) to match desktop sidebar (`sidebar-nav.tsx`).
+    - Added missing pages: **Labels**, **Bot Profile**, **Session Access**.
+    - Moved **Sessions / QR** from Administration to Main group.
+    - Moved **Auto Reply** from Messaging to Automation group.
+    - Fixed icon mismatches (Auto Reply now uses `MessageCircleReply` icon on both mobile and desktop).
+
+---
+
 ## [v1.5.2] - 2026-03-20
 
 ### Added
