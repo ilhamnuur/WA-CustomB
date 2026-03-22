@@ -60,6 +60,7 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
     }
 
     useEffect(() => {
+        setMessages([]);
         fetchMessages();
 
         const newSocket = io({
@@ -73,7 +74,9 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
 
         newSocket.on("message.update", (newMessages: Message[]) => {
             setMessages((prev) => {
-                const combined = [...prev, ...newMessages.filter(m => m.remoteJid === jid)];
+                const combined = [...prev, ...newMessages.filter(m => 
+                    m.remoteJid === jid || prev.some(p => p.remoteJid === m.remoteJid)
+                )];
                 const unique = Array.from(new Map(combined.map(m => [m.keyId, m])).values());
                 return unique.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
             });

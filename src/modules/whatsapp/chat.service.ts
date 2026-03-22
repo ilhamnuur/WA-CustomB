@@ -83,10 +83,27 @@ export class ChatService {
     static async getMessages(dbSessionId: string, jid: string, take: number = 100) {
         // Query with normalized JID to handle @c.us / @s.whatsapp.net variations
         const normalizedJid = normalizeJid(jid);
+        
+        // Find if this contact has both LID and Phone JID in the database
+        const contact = await prisma.contact.findFirst({
+            where: {
+                sessionId: dbSessionId,
+                OR: [{ jid: jid }, { lid: jid }, { remoteJidAlt: jid }, { jid: normalizedJid }]
+            },
+            select: { jid: true, lid: true, remoteJidAlt: true }
+        });
+
+        const queryJids = new Set([jid, normalizedJid]);
+        if (contact) {
+            if (contact.jid) queryJids.add(contact.jid);
+            if (contact.lid) queryJids.add(contact.lid);
+            if (contact.remoteJidAlt) queryJids.add(contact.remoteJidAlt);
+        }
+
         return await prisma.message.findMany({
             where: {
                 sessionId: dbSessionId,
-                remoteJid: normalizedJid
+                remoteJid: { in: Array.from(queryJids) }
             },
             orderBy: { timestamp: 'asc' },
             take

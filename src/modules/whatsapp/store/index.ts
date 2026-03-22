@@ -31,7 +31,6 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
 
     // Handle Messages
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        require('fs').appendFileSync('debug_messages.log', `\n[${new Date().toISOString()}] [messages.upsert] type: ${type}, count: ${messages.length}\n`);
         // Process all message types: notify, append, and history sync
         if (type !== 'notify' && type !== 'append') {
             // For history sync, we still want to save messages
@@ -221,14 +220,8 @@ async function processAndSaveMessage(
         : new Date();
 
     // Filter out Protocol & Empty Messages
-    if (!msg.message) {
-        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Skip: No msg.message\n`);
-        return false;
-    }
-    if (!keyId || !remoteJid) {
-        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Skip: No keyId or remoteJid\n`);
-        return false;
-    }
+    if (!msg.message) return false;
+    if (!keyId || !remoteJid) return false;
 
     // Ignore specific technical message types
     const messageKeys = Object.keys(msg.message);
@@ -242,7 +235,6 @@ async function processAndSaveMessage(
     // If message only contains ignored types, skip
     if (messageKeys.every(k => ignoredTypes.includes(k))) {
         logger.debug("Store", `Skipping technical message: ${keyId} (${messageKeys.join(', ')})`);
-        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Skip: Technical message (${messageKeys.join(', ')})\n`);
         return null;
     }
 
@@ -261,9 +253,6 @@ async function processAndSaveMessage(
                 where: { id: existingMessage.id },
                 data: { status: 'SENT' }
             });
-            require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Updated existing message ${keyId} status to SENT\n`);
-        } else {
-            require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Skip: Message ${keyId} already exists\n`);
         }
         // Return null to indicate "Not New"
         return null;
@@ -331,12 +320,10 @@ async function processAndSaveMessage(
         fileUrl = await downloadAndSaveMedia(msg, sessionId);
     } catch (e) {
         logger.error("Store", "Error downloading media in store", e);
-        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Error downloading media: ${e}\n`);
     }
 
-    let newMessage: any;
     try {
-        newMessage = await prisma.message.create({
+        const newMessage = await prisma.message.create({
             data: {
                 sessionId: dbSessionId,
                 remoteJid: normalizeJid(normalizedRemoteJid),
@@ -351,74 +338,66 @@ async function processAndSaveMessage(
                 timestamp
             }
         });
-        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Success: Created message id ${newMessage.id} for ${keyId}\n`);
-    } catch (e: any) {
-        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] FATAL PRISMA ERROR on create: ${e.message}\n`);
-        throw e;
-    }
-
-    // Ensure contact exists (Upsert Contact)
-    const finalRemoteJid = normalizeJid(normalizedRemoteJid);
-    if (remoteJid && !remoteJid.includes('@g.us') && !remoteJid.includes('status@broadcast')) {
-        const contactJid = finalRemoteJid; // Use fully normalized JID
-        const contactData: any = {
-            sessionId: dbSessionId,
-            jid: contactJid
-        };
-
-        // Only update name/notify if message is FROM the contact (not from me)
-        if (!fromMe) {
-            if (pushName) contactData.notify = pushName;
-            if (pushName) contactData.name = pushName;
-        }
-
-        const contact = await prisma.contact.upsert({
-            where: { sessionId_jid: { sessionId: dbSessionId, jid: contactJid } },
-            create: {
+        
+        // Ensure contact exists (Upsert Contact)
+        const finalRemoteJid = normalizeJid(normalizedRemoteJid);
+        if (remoteJid && !remoteJid.includes('@g.us') && !remoteJid.includes('status@broadcast')) {
+            const contactJid = finalRemoteJid; // Use fully normalized JID
+            const contactData: any = {
                 sessionId: dbSessionId,
-                jid: contactJid,
-                notify: !fromMe ? pushName : undefined,
-                name: !fromMe ? pushName : undefined,
-                // @ts-ignore
-                remoteJidAlt: remoteJidAlt || undefined
-            },
-            update: !fromMe ? {
-                notify: pushName,
-                // @ts-ignore
-                remoteJidAlt: remoteJidAlt || undefined
-            } : {}
-        });
+                jid: contactJid
+            };
 
-        // Welcome Message Logic
-        if (!fromMe && triggerWebhook && config?.welcomeMessage && sock) {
-            // Check if this is a first-time interaction (contact created now)
-            // Or if we want to be more specific, check message counts.
-            // For simplicity, if the contact was just created (Prisma upsert returns the object).
-            // But we can't easily tell if it was 'created' or 'updated' from upsert result without checking timestamps or using separate calls.
+            // Only update name/notify if message is FROM the contact (not from me)
+            if (!fromMe) {
+                if (pushName) contactData.notify = pushName;
+                if (pushName) contactData.name = pushName;
+            }
 
-            // Let's check if message count for this contact is exactly 1 (the one we just saved)
-            const msgCount = await prisma.message.count({
-                where: { sessionId: dbSessionId, remoteJid: finalRemoteJid }
+            const contact = await prisma.contact.upsert({
+                where: { sessionId_jid: { sessionId: dbSessionId, jid: contactJid } },
+                create: {
+                    sessionId: dbSessionId,
+                    jid: contactJid,
+                    notify: !fromMe ? pushName : undefined,
+                    name: !fromMe ? pushName : undefined,
+                    // @ts-ignore
+                    remoteJidAlt: remoteJidAlt || undefined
+                },
+                update: !fromMe ? {
+                    notify: pushName,
+                    // @ts-ignore
+                    remoteJidAlt: remoteJidAlt || undefined
+                } : {}
             });
 
-            if (msgCount === 1) {
-                logger.info("Store", `Sending welcome message to ${finalRemoteJid}`);
-                await sock.sendMessage(finalRemoteJid, { text: config.welcomeMessage });
+            // Welcome Message Logic
+            if (!fromMe && triggerWebhook && config?.welcomeMessage && sock) {
+                // Let's check if message count for this contact is exactly 1 (the one we just saved)
+                const msgCount = await prisma.message.count({
+                    where: { sessionId: dbSessionId, remoteJid: finalRemoteJid }
+                });
+
+                if (msgCount === 1) {
+                    logger.info("Store", `Sending welcome message to ${finalRemoteJid}`);
+                    await sock.sendMessage(finalRemoteJid, { text: config.welcomeMessage });
+                }
             }
         }
-    }
 
-    // Trigger webhook for new messages only (not history sync)
-    // AND filter duplicates is implicitly done because we return 'false' above if existing
-    if (triggerWebhook) {
-        if (fromMe) {
-            onMessageSent(sessionId, msg, fileUrl).catch(e => logger.error("Webhook", "Error in onMessageSent", e));
-        } else {
-            // Pass the fileUrl we just downloaded
-            onMessageReceived(sessionId, msg, fileUrl).catch(e => logger.error("Webhook", "Error in onMessageReceived", e));
+        // Trigger webhook for new messages only (not history sync)
+        if (triggerWebhook) {
+            if (fromMe) {
+                onMessageSent(sessionId, msg, fileUrl).catch(e => logger.error("Webhook", "Error in onMessageSent", e));
+            } else {
+                onMessageReceived(sessionId, msg, fileUrl).catch(e => logger.error("Webhook", "Error in onMessageReceived", e));
+            }
         }
-    }
 
-    return newMessage; // Is New Message = True (Return Object)
+        return newMessage;
+    } catch (e: any) {
+        logger.error("Store", "Error saving message query", e);
+        throw e;
+    }
 }
 // Placeholder - verified that I need to find the logic first
