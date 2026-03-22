@@ -31,6 +31,7 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
 
     // Handle Messages
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
+        require('fs').appendFileSync('debug_messages.log', `\n[${new Date().toISOString()}] [messages.upsert] type: ${type}, count: ${messages.length}\n`);
         // Process all message types: notify, append, and history sync
         if (type !== 'notify' && type !== 'append') {
             // For history sync, we still want to save messages
@@ -220,8 +221,14 @@ async function processAndSaveMessage(
         : new Date();
 
     // Filter out Protocol & Empty Messages
-    if (!msg.message) return false;
-    if (!keyId || !remoteJid) return false;
+    if (!msg.message) {
+        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Skip: No msg.message\n`);
+        return false;
+    }
+    if (!keyId || !remoteJid) {
+        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Skip: No keyId or remoteJid\n`);
+        return false;
+    }
 
     // Ignore specific technical message types
     const messageKeys = Object.keys(msg.message);
@@ -235,6 +242,7 @@ async function processAndSaveMessage(
     // If message only contains ignored types, skip
     if (messageKeys.every(k => ignoredTypes.includes(k))) {
         logger.debug("Store", `Skipping technical message: ${keyId} (${messageKeys.join(', ')})`);
+        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Skip: Technical message (${messageKeys.join(', ')})\n`);
         return null;
     }
 
@@ -253,6 +261,9 @@ async function processAndSaveMessage(
                 where: { id: existingMessage.id },
                 data: { status: 'SENT' }
             });
+            require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Updated existing message ${keyId} status to SENT\n`);
+        } else {
+            require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Skip: Message ${keyId} already exists\n`);
         }
         // Return null to indicate "Not New"
         return null;
@@ -320,23 +331,31 @@ async function processAndSaveMessage(
         fileUrl = await downloadAndSaveMedia(msg, sessionId);
     } catch (e) {
         logger.error("Store", "Error downloading media in store", e);
+        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Error downloading media: ${e}\n`);
     }
 
-    const newMessage = await prisma.message.create({
-        data: {
-            sessionId: dbSessionId,
-            remoteJid: normalizeJid(normalizedRemoteJid),
-            senderJid,
-            fromMe: fromMe || false,
-            keyId,
-            pushName,
-            type: messageType as any,
-            content: text,
-            mediaUrl: fileUrl, // Save Media URL
-            status: fromMe ? "SENT" : "PENDING",
-            timestamp
-        }
-    });
+    let newMessage: any;
+    try {
+        newMessage = await prisma.message.create({
+            data: {
+                sessionId: dbSessionId,
+                remoteJid: normalizeJid(normalizedRemoteJid),
+                senderJid,
+                fromMe: fromMe || false,
+                keyId,
+                pushName,
+                type: messageType as any,
+                content: text,
+                mediaUrl: fileUrl, // Save Media URL
+                status: fromMe ? "SENT" : "PENDING",
+                timestamp
+            }
+        });
+        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] Success: Created message id ${newMessage.id} for ${keyId}\n`);
+    } catch (e: any) {
+        require('fs').appendFileSync('debug_messages.log', `[processAndSaveMessage] FATAL PRISMA ERROR on create: ${e.message}\n`);
+        throw e;
+    }
 
     // Ensure contact exists (Upsert Contact)
     const finalRemoteJid = normalizeJid(normalizedRemoteJid);
