@@ -37,7 +37,9 @@ export async function syncGroups(sock: WASocket, sessionId: string) {
                          restrict: g.restrict,
                          announce: g.announce,
                          participants: g.participants as any,
-                         metadata: g as any
+                         metadata: g as any,
+                         isCommunity: g.isCommunity || false,
+                         linkedParentJid: g.linkedParent || null
                      },
                      update: {
                          subject: g.subject,
@@ -46,7 +48,9 @@ export async function syncGroups(sock: WASocket, sessionId: string) {
                          restrict: g.restrict,
                          announce: g.announce,
                          participants: g.participants as any,
-                         metadata: g as any
+                         metadata: g as any,
+                         isCommunity: g.isCommunity || false,
+                         linkedParentJid: g.linkedParent || null
                      }
                  });
              } catch (e) {

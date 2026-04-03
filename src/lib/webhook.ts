@@ -15,7 +15,10 @@ export type WebhookEventType =
     | "connection.update"
     | "group.update"
     | "contact.update"
-    | "status.update";
+    | "status.update"
+    | "group.participant"
+    | "message.deleted"
+    | "message.edited";
 
 interface WebhookPayload {
     event: WebhookEventType;
@@ -44,10 +47,17 @@ export async function dispatchWebhook(
             return;
         }
 
-        // Find all active webhooks for this user/session
+        // Find all active webhooks for this user/session and anyone having shared access
+        const accesses = await prisma.sessionAccess.findMany({
+            where: { sessionId: session.id },
+            select: { userId: true }
+        });
+        
+        const userIds = [session.userId, ...accesses.map(a => a.userId)];
+
         const webhooks = await prisma.webhook.findMany({
             where: {
-                userId: session.userId,
+                userId: { in: userIds },
                 isActive: true,
                 OR: [
                     { sessionId: null }, // Global webhooks

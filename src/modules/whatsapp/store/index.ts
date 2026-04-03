@@ -201,6 +201,71 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
             }
         }
     });
+
+    // Handle Group Updates
+    sock.ev.on('groups.update', async (updates) => {
+        if (!dbSessionId) return;
+
+        for (const update of updates) {
+            try {
+                if (!update.id) continue;
+                
+                // Keep DB in sync
+                const updateData: any = {};
+                if (update.subject !== undefined) updateData.subject = update.subject;
+                if (update.desc !== undefined) updateData.description = update.desc;
+                if (update.restrict !== undefined) updateData.restrict = update.restrict;
+                if (update.announce !== undefined) updateData.announce = update.announce;
+                if (update.owner !== undefined) updateData.ownerJid = update.owner;
+                if (update.linkedParent !== undefined) updateData.linkedParentJid = update.linkedParent;
+                if (update.isCommunity !== undefined) updateData.isCommunity = update.isCommunity;
+
+                if (Object.keys(updateData).length > 0) {
+                    await prisma.group.updateMany({
+                        where: { sessionId: dbSessionId, jid: update.id },
+                        data: updateData
+                    });
+                }
+                
+                // Trigger webhook
+                dispatchWebhook(sessionId, "group.update", {
+                    jid: update.id,
+                    ...update
+                });
+            } catch (e) {
+                logger.error("Store", "Error in groups.update handling", e);
+            }
+        }
+    });
+
+    // Handle Group Participants Update
+    sock.ev.on('group-participants.update', async (update) => {
+        if (!dbSessionId) return;
+
+        try {
+            // update.id is the group JID
+            // update.participants is array of JIDs
+            // update.action is 'add', 'remove', 'promote', 'demote'
+            dispatchWebhook(sessionId, "group.participant", {
+                jid: update.id,
+                action: update.action,
+                participants: update.participants
+            });
+            
+            // To properly resync the group participants in DB, it's safer to re-fetch the entire group metadata
+            // But we don't await strictly to not block the socket
+            sock.groupMetadata(update.id!).then(async (g) => {
+                await prisma.group.updateMany({
+                    where: { sessionId: dbSessionId, jid: update.id! },
+                    data: { participants: g.participants as any }
+                });
+            }).catch(e => {
+                 logger.debug("Store", "Failed to refresh group participants metadata", e);
+            });
+        } catch (e) {
+            logger.error("Store", "Error in group-participants.update handling", e);
+        }
+    });
 };
 
 async function processAndSaveMessage(
@@ -225,6 +290,60 @@ async function processAndSaveMessage(
 
     // Ignore specific technical message types
     const messageKeys = Object.keys(msg.message);
+
+    // Check for message edit/revoke protocol messages FIRST
+    if (messageKeys.includes('protocolMessage')) {
+        const pMessage = msg.message.protocolMessage;
+        const targetKeyId = pMessage?.key?.id;
+
+        // Message Edit (Type 14)
+        if (pMessage?.type === 14 && targetKeyId) {
+            const editContent = pMessage?.editedMessage;
+            if (editContent) {
+                // Determine new text
+                const normalizedEdit = normalizeMessageContent(editContent);
+                let newText = "";
+                if (normalizedEdit?.conversation) newText = normalizedEdit.conversation;
+                else if (normalizedEdit?.extendedTextMessage?.text) newText = normalizedEdit.extendedTextMessage.text;
+
+                // Update DB safely
+                await prisma.message.updateMany({
+                    where: { sessionId: dbSessionId, keyId: targetKeyId },
+                    data: { content: newText } // Note: we don't update timestamp of original
+                });
+
+                // Trigger Webhook
+                if (triggerWebhook) {
+                    dispatchWebhook(sessionId, "message.edited", {
+                        keyId: targetKeyId,
+                        newContent: newText,
+                        remoteJid,
+                        fromMe
+                    });
+                }
+            }
+            return null; // Stop processing as new message
+        }
+
+        // Message Revoke/Deleted (Type 0)
+        if (pMessage?.type === 0 && targetKeyId) {
+            await prisma.message.updateMany({
+                where: { sessionId: dbSessionId, keyId: targetKeyId },
+                data: { content: "[This message was deleted]", status: "FAILED" }
+            });
+
+            // Trigger Webhook
+            if (triggerWebhook) {
+                dispatchWebhook(sessionId, "message.deleted", {
+                    keyId: targetKeyId,
+                    remoteJid,
+                    fromMe
+                });
+            }
+            return null;
+        }
+    }
+
     const ignoredTypes = [
         'protocolMessage',
         'senderKeyDistributionMessage',
@@ -232,7 +351,7 @@ async function processAndSaveMessage(
         'keepInChatMessage'
     ];
 
-    // If message only contains ignored types, skip
+    // If message only contains ignored types, skip (since edit and revoke handled above)
     if (messageKeys.every(k => ignoredTypes.includes(k))) {
         logger.debug("Store", `Skipping technical message: ${keyId} (${messageKeys.join(', ')})`);
         return null;
