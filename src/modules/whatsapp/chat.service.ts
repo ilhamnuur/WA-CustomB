@@ -15,7 +15,13 @@ export class ChatService {
             select: { jid: true, name: true, notify: true, profilePic: true }
         });
 
-        // 2. Get distinct remoteJids from messages (for chats without a saved contact)
+        // 2. Get Groups for subjects
+        const groups = await prisma.group.findMany({
+            where: { sessionId: dbSessionId },
+            select: { jid: true, subject: true }
+        });
+
+        // 3. Get distinct remoteJids from messages (for chats without a saved contact)
         const messagesWithDistinctJids = await prisma.message.findMany({
             where: { sessionId: dbSessionId },
             distinct: ['remoteJid'],
@@ -24,13 +30,16 @@ export class ChatService {
 
         const allJids = new Set([
             ...contacts.map(c => c.jid),
+            ...groups.map(g => g.jid),
             ...messagesWithDistinctJids.map(m => m.remoteJid)
         ]);
 
         const jidMap = await batchResolveToPhoneJid(Array.from(allJids), dbSessionId);
         
-        // Map contacts for quick lookup
-        const contactMap = new Map(contacts.map(c => [c.jid, c]));
+        // Map contacts and groups for quick lookup
+        const contactMap = new Map();
+        contacts.forEach(c => contactMap.set(c.jid, c));
+        groups.forEach(g => contactMap.set(g.jid, { jid: g.jid, name: g.subject, notify: g.subject, profilePic: null }));
 
         const chatList = await Promise.all(Array.from(allJids).map(async (originalJid) => {
             const resolvedJid = jidMap.get(originalJid) || originalJid;
@@ -83,14 +92,32 @@ export class ChatService {
     static async getMessages(dbSessionId: string, jid: string, take: number = 100) {
         // Query with normalized JID to handle @c.us / @s.whatsapp.net variations
         const normalizedJid = normalizeJid(jid);
-        return await prisma.message.findMany({
+        
+        // Find if this contact has both LID and Phone JID in the database
+        const contact = await prisma.contact.findFirst({
             where: {
                 sessionId: dbSessionId,
-                remoteJid: normalizedJid
+                OR: [{ jid: jid }, { lid: jid }, { remoteJidAlt: jid }, { jid: normalizedJid }]
             },
-            orderBy: { timestamp: 'asc' },
+            select: { jid: true, lid: true, remoteJidAlt: true }
+        });
+
+        const queryJids = new Set([jid, normalizedJid]);
+        if (contact) {
+            if (contact.jid) queryJids.add(contact.jid);
+            if (contact.lid) queryJids.add(contact.lid);
+            if (contact.remoteJidAlt) queryJids.add(contact.remoteJidAlt);
+        }
+
+        const messages = await prisma.message.findMany({
+            where: {
+                sessionId: dbSessionId,
+                remoteJid: { in: Array.from(queryJids) }
+            },
+            orderBy: { timestamp: 'desc' },
             take
         });
+        return messages.reverse();
     }
 
     /**
