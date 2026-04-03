@@ -109,14 +109,15 @@ export class ChatService {
             if (contact.remoteJidAlt) queryJids.add(contact.remoteJidAlt);
         }
 
-        return await prisma.message.findMany({
+        const messages = await prisma.message.findMany({
             where: {
                 sessionId: dbSessionId,
                 remoteJid: { in: Array.from(queryJids) }
             },
-            orderBy: { timestamp: 'asc' },
+            orderBy: { timestamp: 'desc' },
             take
         });
+        return messages.reverse();
     }
 
     /**
