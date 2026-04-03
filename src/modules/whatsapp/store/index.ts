@@ -240,7 +240,7 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
 
     // Handle Group Participants Update
     sock.ev.on('group-participants.update', async (update) => {
-        if (!dbSessionId) return;
+        if (!dbSessionId || !update.id) return;
 
         try {
             // update.id is the group JID
@@ -254,9 +254,9 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
             
             // To properly resync the group participants in DB, it's safer to re-fetch the entire group metadata
             // But we don't await strictly to not block the socket
-            sock.groupMetadata(update.id!).then(async (g) => {
+            sock.groupMetadata(update.id).then(async (g) => {
                 await prisma.group.updateMany({
-                    where: { sessionId: dbSessionId, jid: update.id! },
+                    where: { sessionId: dbSessionId, jid: update.id as string },
                     data: { participants: g.participants as any }
                 });
             }).catch(e => {
