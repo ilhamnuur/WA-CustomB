@@ -15,7 +15,13 @@ export class ChatService {
             select: { jid: true, name: true, notify: true, profilePic: true }
         });
 
-        // 2. Get distinct remoteJids from messages (for chats without a saved contact)
+        // 2. Get Groups for subjects
+        const groups = await prisma.group.findMany({
+            where: { sessionId: dbSessionId },
+            select: { jid: true, subject: true }
+        });
+
+        // 3. Get distinct remoteJids from messages (for chats without a saved contact)
         const messagesWithDistinctJids = await prisma.message.findMany({
             where: { sessionId: dbSessionId },
             distinct: ['remoteJid'],
@@ -24,13 +30,16 @@ export class ChatService {
 
         const allJids = new Set([
             ...contacts.map(c => c.jid),
+            ...groups.map(g => g.jid),
             ...messagesWithDistinctJids.map(m => m.remoteJid)
         ]);
 
         const jidMap = await batchResolveToPhoneJid(Array.from(allJids), dbSessionId);
         
-        // Map contacts for quick lookup
-        const contactMap = new Map(contacts.map(c => [c.jid, c]));
+        // Map contacts and groups for quick lookup
+        const contactMap = new Map();
+        contacts.forEach(c => contactMap.set(c.jid, c));
+        groups.forEach(g => contactMap.set(g.jid, { jid: g.jid, name: g.subject, notify: g.subject, profilePic: null }));
 
         const chatList = await Promise.all(Array.from(allJids).map(async (originalJid) => {
             const resolvedJid = jidMap.get(originalJid) || originalJid;
