@@ -256,7 +256,7 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
             // But we don't await strictly to not block the socket
             sock.groupMetadata(update.id).then(async (g) => {
                 await prisma.group.updateMany({
-                    where: { sessionId: dbSessionId, jid: update.id as string },
+                    where: { sessionId: dbSessionId as string, jid: update.id as string },
                     data: { participants: g.participants as any }
                 });
             }).catch(e => {
