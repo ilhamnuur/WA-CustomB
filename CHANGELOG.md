@@ -1,3 +1,10 @@
+## [v1.5.3-beta.3] - 2026-04-08
+
+### Fixed
+- **Dashboard Webhooks UI**: Added missing `message.edited`, `message.deleted`, and `group.participant` events to the available webhook subscriptions list to ensure full parity with the actual events triggered by the backend engine.
+
+---
+
 ## [v1.5.3-beta.2] - 2026-04-03
 
 ### Added
