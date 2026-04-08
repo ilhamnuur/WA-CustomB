@@ -134,6 +134,10 @@ model Group {
   
   inviteCode  String?
   
+  // Community Features
+  isCommunity Boolean  @default(false)
+  linkedParentJid String? // JID of the community parent group if it belongs to one
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

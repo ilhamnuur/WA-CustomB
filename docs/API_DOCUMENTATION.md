@@ -7043,7 +7043,7 @@ Content-Type: application/json
 | `name` | string | ✅ Yes | — |
 | `url` | string | ✅ Yes | — |
 | `secret` | string | No | — |
-| `events` | array of string | ✅ Yes | — |
+| `events` | array of string | ✅ Yes | Events to subscribe to: `message.received`, `message.sent`, `message.status`, `connection.update`, `group.update`, `contact.update`, `status.update`, `group.participant`, `message.deleted`, `message.edited` or `*` |
 
 **Example:**
 

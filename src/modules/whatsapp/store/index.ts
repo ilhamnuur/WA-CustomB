@@ -6,6 +6,7 @@ import { handleBotCommand, setSessionStartTime } from "../bot/command-handler";
 import { resolveToPhoneJid, isLidJid, normalizeJid } from "@/lib/jid-utils";
 
 import { Server } from "socket.io";
+import { logger } from "@/lib/logger";
 
 export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server | null) => {
     // Set start time for uptime command
@@ -22,9 +23,9 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
         });
         if (session) {
             dbSessionId = session.id;
-            console.log(`Message store initialized for session ${sessionId} (db: ${dbSessionId})`);
+            logger.info("Store", `Message store initialized for session ${sessionId} (db: ${dbSessionId})`);
         } else {
-            console.error(`Session ${sessionId} not found for message store`);
+            logger.error("Store", `Session ${sessionId} not found for message store`);
         }
     })();
 
@@ -33,7 +34,7 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
         // Process all message types: notify, append, and history sync
         if (type !== 'notify' && type !== 'append') {
             // For history sync, we still want to save messages
-            console.log(`Received ${messages.length} messages of type: ${type}`);
+            logger.debug("Store", `Received ${messages.length} messages of type: ${type}`);
         }
 
         // Emit to socket room for real-time frontend updates
@@ -70,10 +71,10 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
                 // Execute Bot Commands (Only for Notify / New Messages)
                 if (type === 'notify' && savedMessage) {
                     // Run in background, don't await strictly to not block saving
-                    handleBotCommand(sock, sessionId, msg).catch(e => console.error("Bot Handler Error", e));
+                    handleBotCommand(sock, sessionId, msg).catch(e => logger.error("Bot", "Bot Handler Error", e));
                 }
             } catch (error) {
-                console.error("Error saving message", error);
+                logger.error("Store", "Error saving message", error);
             }
         }
 
@@ -84,14 +85,14 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
                 ...m,
                 timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp
             }));
-            console.log(`[Socket] Emitting message.update for ${serialized.length} messages in session ${sessionId}`, serialized.map((m: any) => ({ keyId: m.keyId, remoteJid: m.remoteJid, fromMe: m.fromMe })));
+            logger.debug("Socket", `Emitting message.update for ${serialized.length} messages in session ${sessionId}`);
             io?.to(sessionId).emit('message.update', serialized);
         }
     });
 
     // Handle Message History Sync (when connecting for the first time or syncing)
     sock.ev.on('messaging-history.set', async ({ messages, chats, contacts, isLatest }) => {
-        console.log(`History sync: ${messages?.length || 0} messages, ${chats?.length || 0} chats, ${contacts?.length || 0} contacts, latest: ${isLatest}`);
+        logger.info("Store", `History sync: ${messages?.length || 0} messages, ${chats?.length || 0} chats, ${contacts?.length || 0} contacts, latest: ${isLatest}`);
 
         // Ensure we have the database session ID
         if (!dbSessionId) {
@@ -102,21 +103,21 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
 
         // Save all historical messages
         if (messages && messages.length > 0) {
-            console.log(`Syncing ${messages.length} historical messages...`);
+            logger.info("Store", `Syncing ${messages.length} historical messages...`);
             for (const msg of messages) {
                 try {
                     await processAndSaveMessage(msg, dbSessionId, sessionId, false, sock);
                 } catch (error) {
-                    console.error("Error saving historical message", error);
+                    logger.error("Store", "Error saving historical message", error);
                 }
             }
-            console.log(`Finished syncing ${messages.length} historical messages`);
+            logger.success("Store", `Finished syncing ${messages.length} historical messages`);
         }
 
 
         // Note: Contacts and Chats are synced by src/modules/whatsapp/store/contacts.ts
         // We only handle messages here to avoid P2002 Unique Constraint Race Conditions.
-        console.log(`Finished syncing ${messages.length} historical messages`);
+        logger.debug("Store", `Finished syncing messages`);
     });
 
     // Handle Contacts Upsert
@@ -160,7 +161,7 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
                 // Dispatch webhook for contact update
                 dispatchWebhook(sessionId, "contact.update", { jid: c.id, name: c.name, notify: c.notify });
             } catch (e) {
-                console.error("Error saving contact", e);
+                logger.error("Store", "Error saving contact", e);
             }
         }
     });
@@ -196,8 +197,73 @@ export const bindSessionStore = (sock: WASocket, sessionId: string, io: Server |
                     status
                 });
             } catch (e) {
-                console.error("Error updating message status", e);
+                logger.error("Store", "Error updating message status", e);
             }
+        }
+    });
+
+    // Handle Group Updates
+    sock.ev.on('groups.update', async (updates) => {
+        if (!dbSessionId) return;
+
+        for (const update of updates) {
+            try {
+                if (!update.id) continue;
+                
+                // Keep DB in sync
+                const updateData: any = {};
+                if (update.subject !== undefined) updateData.subject = update.subject;
+                if (update.desc !== undefined) updateData.description = update.desc;
+                if (update.restrict !== undefined) updateData.restrict = update.restrict;
+                if (update.announce !== undefined) updateData.announce = update.announce;
+                if (update.owner !== undefined) updateData.ownerJid = update.owner;
+                if (update.linkedParent !== undefined) updateData.linkedParentJid = update.linkedParent;
+                if (update.isCommunity !== undefined) updateData.isCommunity = update.isCommunity;
+
+                if (Object.keys(updateData).length > 0) {
+                    await prisma.group.updateMany({
+                        where: { sessionId: dbSessionId, jid: update.id },
+                        data: updateData
+                    });
+                }
+                
+                // Trigger webhook
+                dispatchWebhook(sessionId, "group.update", {
+                    jid: update.id,
+                    ...update
+                });
+            } catch (e) {
+                logger.error("Store", "Error in groups.update handling", e);
+            }
+        }
+    });
+
+    // Handle Group Participants Update
+    sock.ev.on('group-participants.update', async (update) => {
+        if (!dbSessionId || !update.id) return;
+
+        try {
+            // update.id is the group JID
+            // update.participants is array of JIDs
+            // update.action is 'add', 'remove', 'promote', 'demote'
+            dispatchWebhook(sessionId, "group.participant", {
+                jid: update.id,
+                action: update.action,
+                participants: update.participants
+            });
+            
+            // To properly resync the group participants in DB, it's safer to re-fetch the entire group metadata
+            // But we don't await strictly to not block the socket
+            sock.groupMetadata(update.id).then(async (g) => {
+                await prisma.group.updateMany({
+                    where: { sessionId: dbSessionId as string, jid: update.id as string },
+                    data: { participants: g.participants as any }
+                });
+            }).catch(e => {
+                 logger.debug("Store", "Failed to refresh group participants metadata", e);
+            });
+        } catch (e) {
+            logger.error("Store", "Error in group-participants.update handling", e);
         }
     });
 };
@@ -224,6 +290,60 @@ async function processAndSaveMessage(
 
     // Ignore specific technical message types
     const messageKeys = Object.keys(msg.message);
+
+    // Check for message edit/revoke protocol messages FIRST
+    if (messageKeys.includes('protocolMessage')) {
+        const pMessage = msg.message.protocolMessage;
+        const targetKeyId = pMessage?.key?.id;
+
+        // Message Edit (Type 14)
+        if (pMessage?.type === 14 && targetKeyId) {
+            const editContent = pMessage?.editedMessage;
+            if (editContent) {
+                // Determine new text
+                const normalizedEdit = normalizeMessageContent(editContent);
+                let newText = "";
+                if (normalizedEdit?.conversation) newText = normalizedEdit.conversation;
+                else if (normalizedEdit?.extendedTextMessage?.text) newText = normalizedEdit.extendedTextMessage.text;
+
+                // Update DB safely
+                await prisma.message.updateMany({
+                    where: { sessionId: dbSessionId, keyId: targetKeyId },
+                    data: { content: newText } // Note: we don't update timestamp of original
+                });
+
+                // Trigger Webhook
+                if (triggerWebhook) {
+                    dispatchWebhook(sessionId, "message.edited", {
+                        keyId: targetKeyId,
+                        newContent: newText,
+                        remoteJid,
+                        fromMe
+                    });
+                }
+            }
+            return null; // Stop processing as new message
+        }
+
+        // Message Revoke/Deleted (Type 0)
+        if (pMessage?.type === 0 && targetKeyId) {
+            await prisma.message.updateMany({
+                where: { sessionId: dbSessionId, keyId: targetKeyId },
+                data: { content: "[This message was deleted]", status: "FAILED" }
+            });
+
+            // Trigger Webhook
+            if (triggerWebhook) {
+                dispatchWebhook(sessionId, "message.deleted", {
+                    keyId: targetKeyId,
+                    remoteJid,
+                    fromMe
+                });
+            }
+            return null;
+        }
+    }
+
     const ignoredTypes = [
         'protocolMessage',
         'senderKeyDistributionMessage',
@@ -231,9 +351,9 @@ async function processAndSaveMessage(
         'keepInChatMessage'
     ];
 
-    // If message only contains ignored types, skip
+    // If message only contains ignored types, skip (since edit and revoke handled above)
     if (messageKeys.every(k => ignoredTypes.includes(k))) {
-        console.log(`Skipping technical message: ${keyId} (${messageKeys.join(', ')})`);
+        logger.debug("Store", `Skipping technical message: ${keyId} (${messageKeys.join(', ')})`);
         return null;
     }
 
@@ -259,7 +379,7 @@ async function processAndSaveMessage(
 
     // Debug fromMe issue (Keep this for a while)
     if (fromMe === undefined || fromMe === null) {
-        console.log(`[DEBUG] Message ${keyId} has fromMe=${fromMe}. Key:`, JSON.stringify(msg.key));
+        logger.warn("Store", `[DEBUG] Message ${keyId} has fromMe=${fromMe}. Key:`, msg.key);
     }
 
     const messageContent = normalizeMessageContent(msg.message);
@@ -318,87 +438,85 @@ async function processAndSaveMessage(
     try {
         fileUrl = await downloadAndSaveMedia(msg, sessionId);
     } catch (e) {
-        console.error("Error downloading media in store", e);
+        logger.error("Store", "Error downloading media in store", e);
     }
 
-    const newMessage = await prisma.message.create({
-        data: {
-            sessionId: dbSessionId,
-            remoteJid: normalizeJid(normalizedRemoteJid),
-            senderJid,
-            fromMe: fromMe || false,
-            keyId,
-            pushName,
-            type: messageType as any,
-            content: text,
-            mediaUrl: fileUrl, // Save Media URL
-            status: fromMe ? "SENT" : "PENDING",
-            timestamp
-        }
-    });
-
-    // Ensure contact exists (Upsert Contact)
-    const finalRemoteJid = normalizeJid(normalizedRemoteJid);
-    if (remoteJid && !remoteJid.includes('@g.us') && !remoteJid.includes('status@broadcast')) {
-        const contactJid = finalRemoteJid; // Use fully normalized JID
-        const contactData: any = {
-            sessionId: dbSessionId,
-            jid: contactJid
-        };
-
-        // Only update name/notify if message is FROM the contact (not from me)
-        if (!fromMe) {
-            if (pushName) contactData.notify = pushName;
-            if (pushName) contactData.name = pushName;
-        }
-
-        const contact = await prisma.contact.upsert({
-            where: { sessionId_jid: { sessionId: dbSessionId, jid: contactJid } },
-            create: {
+    try {
+        const newMessage = await prisma.message.create({
+            data: {
                 sessionId: dbSessionId,
-                jid: contactJid,
-                notify: !fromMe ? pushName : undefined,
-                name: !fromMe ? pushName : undefined,
-                // @ts-ignore
-                remoteJidAlt: remoteJidAlt || undefined
-            },
-            update: !fromMe ? {
-                notify: pushName,
-                // @ts-ignore
-                remoteJidAlt: remoteJidAlt || undefined
-            } : {}
+                remoteJid: normalizeJid(normalizedRemoteJid),
+                senderJid,
+                fromMe: fromMe || false,
+                keyId,
+                pushName,
+                type: messageType as any,
+                content: text,
+                mediaUrl: fileUrl, // Save Media URL
+                status: fromMe ? "SENT" : "PENDING",
+                timestamp
+            }
         });
+        
+        // Ensure contact exists (Upsert Contact)
+        const finalRemoteJid = normalizeJid(normalizedRemoteJid);
+        if (remoteJid && !remoteJid.includes('@g.us') && !remoteJid.includes('status@broadcast')) {
+            const contactJid = finalRemoteJid; // Use fully normalized JID
+            const contactData: any = {
+                sessionId: dbSessionId,
+                jid: contactJid
+            };
 
-        // Welcome Message Logic
-        if (!fromMe && triggerWebhook && config?.welcomeMessage && sock) {
-            // Check if this is a first-time interaction (contact created now)
-            // Or if we want to be more specific, check message counts.
-            // For simplicity, if the contact was just created (Prisma upsert returns the object).
-            // But we can't easily tell if it was 'created' or 'updated' from upsert result without checking timestamps or using separate calls.
+            // Only update name/notify if message is FROM the contact (not from me)
+            if (!fromMe) {
+                if (pushName) contactData.notify = pushName;
+                if (pushName) contactData.name = pushName;
+            }
 
-            // Let's check if message count for this contact is exactly 1 (the one we just saved)
-            const msgCount = await prisma.message.count({
-                where: { sessionId: dbSessionId, remoteJid: finalRemoteJid }
+            const contact = await prisma.contact.upsert({
+                where: { sessionId_jid: { sessionId: dbSessionId, jid: contactJid } },
+                create: {
+                    sessionId: dbSessionId,
+                    jid: contactJid,
+                    notify: !fromMe ? pushName : undefined,
+                    name: !fromMe ? pushName : undefined,
+                    // @ts-ignore
+                    remoteJidAlt: remoteJidAlt || undefined
+                },
+                update: !fromMe ? {
+                    notify: pushName,
+                    // @ts-ignore
+                    remoteJidAlt: remoteJidAlt || undefined
+                } : {}
             });
 
-            if (msgCount === 1) {
-                console.log(`Sending welcome message to ${finalRemoteJid}`);
-                await sock.sendMessage(finalRemoteJid, { text: config.welcomeMessage });
+            // Welcome Message Logic
+            if (!fromMe && triggerWebhook && config?.welcomeMessage && sock) {
+                // Let's check if message count for this contact is exactly 1 (the one we just saved)
+                const msgCount = await prisma.message.count({
+                    where: { sessionId: dbSessionId, remoteJid: finalRemoteJid }
+                });
+
+                if (msgCount === 1) {
+                    logger.info("Store", `Sending welcome message to ${finalRemoteJid}`);
+                    await sock.sendMessage(finalRemoteJid, { text: config.welcomeMessage });
+                }
             }
         }
-    }
 
-    // Trigger webhook for new messages only (not history sync)
-    // AND filter duplicates is implicitly done because we return 'false' above if existing
-    if (triggerWebhook) {
-        if (fromMe) {
-            onMessageSent(sessionId, msg, fileUrl).catch(e => console.error("Error in onMessageSent", e));
-        } else {
-            // Pass the fileUrl we just downloaded
-            onMessageReceived(sessionId, msg, fileUrl).catch(e => console.error("Error in onMessageReceived", e));
+        // Trigger webhook for new messages only (not history sync)
+        if (triggerWebhook) {
+            if (fromMe) {
+                onMessageSent(sessionId, msg, fileUrl).catch(e => logger.error("Webhook", "Error in onMessageSent", e));
+            } else {
+                onMessageReceived(sessionId, msg, fileUrl).catch(e => logger.error("Webhook", "Error in onMessageReceived", e));
+            }
         }
-    }
 
-    return newMessage; // Is New Message = True (Return Object)
+        return newMessage;
+    } catch (e: any) {
+        logger.error("Store", "Error saving message query", e);
+        throw e;
+    }
 }
 // Placeholder - verified that I need to find the logic first

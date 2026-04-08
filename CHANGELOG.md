@@ -1,3 +1,90 @@
+## [v1.5.3] - 2026-04-08
+
+### Added
+- **WhatsApp Communities Support**: Added `isCommunity` and `linkedParentJid` to Group metadata schema, including automatic recognition and storage of Community structures during Group synchronization.
+- **Advanced Webhook Events**: Added `group.update`, `group.participant`, `message.edited`, and `message.deleted` events for real-time tracking of precise WhatsApp actions.
+- **Drag and Drop Media**: Added intuitive Drag and Drop overlay to the Chat Window for instant image, video, audio, and document uploads.
+- **Media Download Enhancements**: Enhanced Media layout in Chat Window with "Download" buttons and an interactive "Downloading..." notification toaster UI.
+- **Shared Session Webhooks**: Webhooks are now universally dispatched to all users with shared `SessionAccess`, instead of only the original session owner.
+- **Labels Chat Assignment**: Enhanced Labels page with expandable cards showing assigned chats, and a contact picker to assign/unassign chats from labels.
+- **Label Chats API**: New `GET /api/labels/[sessionId]/chats?labelId=` endpoint to fetch chats assigned to a label with contact name enrichment.
+
+### Changed
+- **Beautiful Console Logger**: Replaced all standard `console.log` and `console.error` calls across the core backend engine with a custom colored `logger` module.
+
+### Fixed
+- **Dashboard Webhooks UI**: Added missing `message.edited`, `message.deleted`, and `group.participant` events to the available webhook subscriptions list.
+- **Initial Sync Message Disappearance**: Fixed a bug where initial messages in newly created chats were skipped when wrapped inside protocol messages (like edit/revoke types).
+- **Missing Group Names in Chat List**: `ChatService.getChatsList` now natively fetches from the `Group` model so group chats don't appear as blank phone numbers.
+- **Chat History Pagination**: Fixed a UI bug where the Chat Window would load the oldest 100 messages instead of newest ones. Corrected `.us` vs `.net` JID mismatches for real-time WebSockets.
+- **Dashboard Disconnect Stats**: Perfected System Monitor Disconnected counts to properly group anything other than `CONNECTED` (e.g. `LOGGED_OUT`, `SCAN_QR`) as disconnected, accurately pulling from DB history when offline.
+- **Pushed Names in Private Chats**: Prevented sender push names from rendering above chat bubbles in private Direct Messages (now strictly restricted to Group Chats).
+- **Mobile Responsiveness Enhancements**: 
+    - Replaced `<p>` with `<SheetDescription>` in mobile nav to fix Radix UI accessibility warnings.
+    - Hidden clock and divider on small screens, reduced session selector width.
+    - Made Session Detail Page Header responsive with flex-wrap for mobile.
+- **Contacts Page Pagination**: Replaced unreasonable limit options (up to 3000) with 10/25/50/100/Show All options limit API parameters.
+
+---
+
+## [v1.5.3-beta.3] - 2026-04-08
+
+### Fixed
+- **Dashboard Webhooks UI**: Added missing `message.edited`, `message.deleted`, and `group.participant` events to the available webhook subscriptions list to ensure full parity with the actual events triggered by the backend engine.
+
+---
+
+## [v1.5.3-beta.2] - 2026-04-03
+
+### Added
+- **WhatsApp Communities Support**:
+    - Added `isCommunity` and `linkedParentJid` to Group metadata schema.
+    - Automatic recognition and storage of Community structures during Group synchronization.
+- **Advanced Webhook Events**:
+    - Added `group.update` event (triggered on subject, description, or group picture changes).
+    - Added `group.participant` event (triggered when users join, leave, or are promoted/demoted).
+    - Added `message.edited` and `message.deleted` (revoke) events for real-time tracking of message modifications.
+- **Drag and Drop Media**:
+    - Added intuitive Drag and Drop overlay to the Chat Window for instant image, video, audio, and document uploads.
+- **Media Download Enhancements**:
+    - Enhanced Media layout in Chat Window with generic "Download" buttons for Images, Videos, Audio, and Documents.
+    - Added an interactive "Downloading..." notification toaster UI.
+- **Shared Session Webhooks**:
+    - Webhooks are now universally dispatched to all users with shared `SessionAccess`, instead of only the original session owner.
+
+### Fixed
+- **Initial Sync Message Disappearance**:
+    - Fixed a bug where initial messages in newly created chats were completely skipped because Baileys wrapped them inside protocol messages (like edit/revoke types). 
+- **Missing Group Names in Chat List**:
+    - Fixed an issue where group chats appeared as blank phone numbers in the Chat List dashboard. `ChatService.getChatsList` now natively fetches from the `Group` model for accurate subject rendering.
+- **Chat History Pagination**:
+    - Fixed a UI bug where the Chat Window would load the **oldest 100 messages** instead of the newest ones (`orderBy` timestamp was ascending). Newest messages now load reliably.
+    - Corrected real-time WebSocket `.us` vs `.net` JID inconsistencies so incoming messages snap exactly into active windows.
+- **Dashboard Disconnect Stats**:
+    - Perfected System Monitor Disconnected counts: Everything *other* than `CONNECTED` (e.g. `LOGGED_OUT`, `SCAN_QR`) is now logically grouped as disconnected.
+- **Pushed Names in Private Chats**:
+    - Prevented sender push names from rendering above chat bubbles in private Direct Messages (now strictly restricted to Group Chats).
+
+---
+
+## [v1.5.3-beta.1] - 2026-03-22
+
+### Fixed
+- **SheetContent Accessibility Warning**: Replaced `<p>` with `<SheetDescription>` in mobile nav to fix Radix `aria-describedby` warning.
+- **Navbar Overflow on Mobile**: Hidden clock and divider on small screens, reduced session selector width.
+- **Session Detail Page Header**: Made responsive with flex-wrap for mobile.
+- **Disconnect Stats Returning Zeros**: System monitor API now queries real DB counts even when session is offline.
+- **Contacts Page Pagination**: Replaced unreasonable limit options (up to 3000) with 10/25/50/100/Show All. API now supports `limit=all`.
+
+### Added
+- **Labels Chat Assignment**: Enhanced Labels page with expandable cards showing assigned chats, contact picker to assign/unassign chats from labels.
+- **Label Chats API**: New `GET /api/labels/[sessionId]/chats?labelId=` endpoint to fetch chats assigned to a label with contact name enrichment.
+
+### Changed
+- **Beautiful Console Logger**: Replaced all standard `console.log`, `console.warn`, and `console.error` calls across the core WhatsApp engine, socket server, background jobs, and utility modules with a custom colored `logger`. This makes server logs much more readable and debugging significantly easier.
+
+---
+
 ## [v1.5.2.1] - 2026-03-22
 
 ### Fixed

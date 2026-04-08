@@ -127,7 +127,11 @@ All endpoints require authentication via:
                             id: { type: "string" },
                             sessionId: { type: "string" },
                             url: { type: "string" },
-                            events: { type: "array", items: { type: "string" } },
+                            events: { 
+                                type: "array", 
+                                items: { type: "string" },
+                                description: "Events to subscribe to: message.received, message.sent, message.status, connection.update, group.update, contact.update, status.update, group.participant, message.deleted, message.edited or '*'" 
+                            },
                             secret: { type: "string" }
                         }
                     },
@@ -139,6 +143,8 @@ All endpoints require authentication via:
                             desc: { type: "string" },
                             owner: { type: "string" },
                             size: { type: "number" },
+                            isCommunity: { type: "boolean", description: "Whether this group is a WhatsApp Community announcement group" },
+                            linkedParentJid: { type: "string", nullable: true, description: "JID of the parent community if this is a sub-group" },
                             participants: {
                                 type: "array",
                                 items: {

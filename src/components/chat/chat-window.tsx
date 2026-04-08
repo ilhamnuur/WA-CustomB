@@ -38,6 +38,7 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
     const [socket, setSocket] = useState<Socket | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadType, setUploadType] = useState<string>("image");
+    const [isDragging, setIsDragging] = useState(false);
 
     const scrollToBottom = (smooth = true) => {
         if (scrollRef.current) {
@@ -60,6 +61,7 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
     }
 
     useEffect(() => {
+        setMessages([]);
         fetchMessages();
 
         const newSocket = io({
@@ -71,9 +73,13 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
             newSocket.emit("join-session", sessionId);
         });
 
+        const normalizedJid = jid.endsWith("@c.us") ? jid.replace("@c.us", "@s.whatsapp.net") : jid;
+
         newSocket.on("message.update", (newMessages: Message[]) => {
             setMessages((prev) => {
-                const combined = [...prev, ...newMessages.filter(m => m.remoteJid === jid)];
+                const combined = [...prev, ...newMessages.filter(m => 
+                    m.remoteJid === normalizedJid || prev.some(p => p.remoteJid === m.remoteJid)
+                )];
                 const unique = Array.from(new Map(combined.map(m => [m.keyId, m])).values());
                 return unique.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
             });
@@ -100,33 +106,73 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
         }
     };
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
+    const processFileUpload = async (file: File, explicitType?: string) => {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("type", uploadType);
 
+        let type = explicitType;
+        if (!type || type === '*') {
+            if (file.type.startsWith('image/')) type = 'image';
+            else if (file.type.startsWith('video/')) type = 'video';
+            else if (file.type.startsWith('audio/')) type = 'audio';
+            else type = 'document';
+        }
+
+        formData.append("type", type);
         formData.append("sessionId", sessionId);
         formData.append("jid", jid);
 
         try {
-            toast.info("Sending...");
+            toast.info(`Sending ${file.name}...`);
             await sendMediaMessage(formData);
             toast.success("Sent!");
-            setTimeout(() => fetchMessages(), 800); // Delay to allow Baileys to save
+            setTimeout(() => fetchMessages(), 800);
         } catch (error: any) {
             console.error(error);
             toast.error(error.message || "Failed to send media");
-        } finally {
-            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        await processFileUpload(file, uploadType);
+        
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            // Process the first file for now
+            await processFileUpload(files[0]);
         }
     };
 
     const handleDownload = async (url: string, fileName: string) => {
         try {
+            toast.info("Downloading file...");
             const response = await fetch(url);
+            if (!response.ok) throw new Error("File not found or unreachable");
             const blob = await response.blob();
             const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -138,7 +184,7 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
             window.URL.revokeObjectURL(downloadUrl);
         } catch (error) {
             console.error("Download failed", error);
-            toast.error("Download failed");
+            toast.error("Download failed! Ensure the file URL is accessible.");
         }
     };
 
@@ -163,9 +209,24 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
     const displayName = name || jid.split('@')[0];
 
     return (
-        <div className="flex flex-col h-full bg-muted/20">
+        <div 
+            className="flex flex-col h-full bg-muted/20 relative"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {/* Drag & Drop Overlay */}
+            {isDragging && (
+                <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary flex items-center justify-center flex-col gap-3 rounded-lg m-2">
+                    <div className="h-16 w-16 bg-primary/20 rounded-full flex items-center justify-center">
+                        <Paperclip className="h-8 w-8 text-primary" />
+                    </div>
+                    <p className="text-lg font-semibold text-primary">Drop files to send here</p>
+                </div>
+            )}
+
             {/* Header */}
-            <div className="px-3 py-2.5 border-b bg-background/80 backdrop-blur-sm flex items-center gap-3 flex-shrink-0">
+            <div className="px-3 py-2.5 border-b bg-background/80 backdrop-blur-sm flex items-center gap-3 flex-shrink-0 z-10">
                 {onBack && (
                     <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden flex-shrink-0 text-muted-foreground hover:text-foreground" onClick={onBack}>
                         <ArrowLeft className="h-4 w-4" />
@@ -183,7 +244,7 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 styled-scrollbar" style={{
+            <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 styled-scrollbar relative z-0" style={{
                 backgroundImage: `radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.04) 1px, transparent 0)`,
                 backgroundSize: '24px 24px'
             }}>
@@ -211,7 +272,7 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
                                         )}
                                     >
                                         {/* Sender Name (group messages) */}
-                                        {!msg.fromMe && msg.pushName && (
+                                        {!msg.fromMe && jid.endsWith("@g.us") && msg.pushName && (
                                             <span className="text-[10px] font-semibold text-primary block mb-0.5">
                                                 {msg.pushName}
                                             </span>

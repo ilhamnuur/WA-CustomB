@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { WASocket, GroupMetadata } from "@whiskeysockets/baileys";
+import { logger } from "@/lib/logger";
 
 export async function syncGroups(sock: WASocket, sessionId: string) {
     try {
@@ -10,7 +11,7 @@ export async function syncGroups(sock: WASocket, sessionId: string) {
         });
         
         if (!session) {
-            console.error(`Session ${sessionId} does not exist, cannot sync groups`);
+            logger.error("Store", `Session ${sessionId} does not exist, cannot sync groups`);
             return;
         }
 
@@ -20,7 +21,7 @@ export async function syncGroups(sock: WASocket, sessionId: string) {
         const groups = await sock.groupFetchAllParticipating();
         const groupList = Object.values(groups);
 
-        console.log(`Found ${groupList.length} groups for session ${sessionId}`);
+        logger.info("Store", `Found ${groupList.length} groups for session ${sessionId}`);
 
         for (const g of groupList) {
              try {
@@ -36,7 +37,9 @@ export async function syncGroups(sock: WASocket, sessionId: string) {
                          restrict: g.restrict,
                          announce: g.announce,
                          participants: g.participants as any,
-                         metadata: g as any
+                         metadata: g as any,
+                         isCommunity: g.isCommunity || false,
+                         linkedParentJid: g.linkedParent || null
                      },
                      update: {
                          subject: g.subject,
@@ -45,15 +48,17 @@ export async function syncGroups(sock: WASocket, sessionId: string) {
                          restrict: g.restrict,
                          announce: g.announce,
                          participants: g.participants as any,
-                         metadata: g as any
+                         metadata: g as any,
+                         isCommunity: g.isCommunity || false,
+                         linkedParentJid: g.linkedParent || null
                      }
                  });
              } catch (e) {
                  console.error(`Failed to sync group ${g.id}`, e);
              }
         }
-        console.log(`Synced ${groupList.length} groups for session ${sessionId}`);
+        logger.success("Store", `Synced ${groupList.length} groups for session ${sessionId}`);
     } catch (e) {
-        console.error("Failed to sync groups", e);
+        logger.error("Store", "Failed to sync groups", e);
     }
 }

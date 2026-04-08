@@ -32,8 +32,8 @@ export default async function DashboardPage() {
 
     const totalSessions = sessions.length;
     const connectedSessions = sessions.filter(s => s.status === 'CONNECTED').length;
-    const disconnectedSessions = sessions.filter(s => s.status === 'DISCONNECTED' || s.status === 'CLOSE').length;
-    const otherSessions = totalSessions - connectedSessions - disconnectedSessions;
+    const disconnectedSessions = totalSessions - connectedSessions; // Anything not connected is disconnected
+    const otherSessions = 0;
 
     // Fetch auto-reply count for accessible sessions
     let autoReplyCount = 0;
@@ -181,7 +181,7 @@ export default async function DashboardPage() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {sessions.map(s => {
                             const isConnected = s.status === 'CONNECTED';
-                            const isDisconnected = s.status === 'DISCONNECTED' || s.status === 'CLOSE';
+                            const isDisconnected = !isConnected;
 
                             return (
                                 <Link key={s.id} href={`/dashboard/sessions/${s.sessionId}`}>
