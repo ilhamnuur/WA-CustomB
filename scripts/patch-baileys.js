@@ -27,10 +27,14 @@ try {
         
         // 1. Add extra fields from result
         const directPathRegex = /directPath:\s*result\.direct_path,/;
-        if (!content.includes('thumbnailDirectPath: result.thumbnail_direct_path') && directPathRegex.test(content)) {
+        if (!content.includes('thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path') && directPathRegex.test(content)) {
             content = content.replace(
                 directPathRegex,
-                'directPath: result.direct_path,\n                        thumbnailDirectPath: result.thumbnail_direct_path,\n                        thumbnailSha256: result.thumbnail_sha256,\n                        handle: result.handle,'
+                `mediaUrl: result.url || result.direct_path,
+                        directPath: result.direct_path,
+                        thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path,
+                        thumbnailSha256: result.thumbnail_info?.thumbnail_sha256,
+                        handle: result.handle,`
             );
             patched = true;
         }
