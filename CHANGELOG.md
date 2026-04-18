@@ -2,7 +2,7 @@
 
 ### Fixed
 - **Newsletter Media Webhook Crash**: Fixed a critical issue where sending unencrypted media to a WhatsApp Newsletter would crash the webhook (`Cannot derive from empty media key`) by securely downloading the unencrypted file straight from the WhatsApp MMG servers using its `directPath`.
-- **Newsletter Media Send Silent Failure**: Patched a known Baileys bug ([#2345](https://github.com/WhiskeySockets/Baileys/issues/2345)) where media sent to newsletters would return 200 OK but never appear in the channel, caused by an incorrect CDN `directPath` prefix (`/o1/` → `/m1/`). Added auto-reapply via `postinstall` script.
+- **Newsletter Media (Error 479) & Silent Failure**: Overhauled the Baileys patch script to fully implement official PR `#2434` fixes for WhatsApp Newsletters. The robust RegEx-powered `postinstall` patch now correctly redirects uploads to `/newsletter/newsletter-*` paths, appends `server_thumb_gen=1`, enforces `url: null` for unencrypted objects, maps proper thumbnail hashes, and sets `mediatype` nodes. This fully resolves the mysterious "Error 479" ACK rejections and silent failures when sending media to channels.
 
 ---
 
