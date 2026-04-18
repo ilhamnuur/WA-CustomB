@@ -26,11 +26,18 @@ try {
         let patched = false;
         
         // 1. Add extra fields from result
-        const directPathRegex = /directPath:\s*result\.direct_path,/;
+        const directPathRegex = /if\s*\(result\?\.url\s*\|\|\s*result\?\.directPath\)\s*\{/;
         if (!content.includes('thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path') && directPathRegex.test(content)) {
             content = content.replace(
                 directPathRegex,
-                `mediaUrl: result.url || result.direct_path,
+                `if (result?.url || result?.direct_path) {`
+            );
+            
+            const fieldsRegex = /urls\s*=\s*\{\s*mediaUrl:\s*result\.url,\s*directPath:\s*result\.direct_path,/;
+            content = content.replace(
+                fieldsRegex,
+                `urls = {
+                        mediaUrl: result.url || result.direct_path,
                         directPath: result.direct_path,
                         thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path,
                         thumbnailSha256: result.thumbnail_info?.thumbnail_sha256,
