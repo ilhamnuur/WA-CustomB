@@ -180,22 +180,17 @@ export async function downloadAndSaveMedia(message: WAMessage, sessionId: string
         // Newsletter media is not encrypted and doesn't have a mediaKey
         if (!mediaObj.mediaKey && (mediaObj.url || mediaObj.directPath)) {
             logger.info("Media", "Downloading unencrypted media (newsletter)...");
-            
-            // Reconstruct URL if only directPath is available
-            const mediaUrl = mediaObj.url || (mediaObj.directPath ? `https://mmg.whatsapp.net${mediaObj.directPath.startsWith('/') ? '' : '/'}${mediaObj.directPath}` : null);
-            
-            if (mediaUrl) {
-                try {
-                    const res = await fetch(mediaUrl);
-                    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-                    buffer = Buffer.from(await res.arrayBuffer());
-                } catch (e) {
-                    logger.error("Media", "Failed to fetch unencrypted media url:", e);
-                    return null;
-                }
-            } else {
-                 logger.warn("Media", "No URL/directPath found for unencrypted media");
-                 return null;
+
+            try {
+                // Use downloadMediaMessage — Baileys handles auth headers automatically
+                buffer = await downloadMediaMessage(
+                    message,
+                    "buffer",
+                    {}
+                ) as Buffer;
+            } catch (e) {
+                logger.error("Media", "Failed to download newsletter media via Baileys:", e);
+                return null;
             }
         } else {
             buffer = await downloadMediaMessage(

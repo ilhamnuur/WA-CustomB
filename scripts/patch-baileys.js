@@ -26,23 +26,48 @@ try {
         let patched = false;
         
         // 1. Add extra fields from result
-        const directPathRegex = /directPath:\s*result\.direct_path,/;
-        if (!content.includes('thumbnailDirectPath: result.thumbnail_direct_path') && directPathRegex.test(content)) {
+        const directPathRegex = /if\s*\(result\?\.url\s*\|\|\s*result\?\.directPath\)\s*\{/;
+        if (!content.includes('thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path') && directPathRegex.test(content)) {
             content = content.replace(
                 directPathRegex,
-                'directPath: result.direct_path,\n                        thumbnailDirectPath: result.thumbnail_direct_path,\n                        thumbnailSha256: result.thumbnail_sha256,\n                        handle: result.handle,'
+                `if (result?.url || result?.direct_path) {`
+            );
+            
+            const fieldsRegex = /urls\s*=\s*\{\s*mediaUrl:\s*result\.url(?:\s*\|\|\s*result\.direct_path)?,\s*directPath:\s*result\.direct_path,/;
+            content = content.replace(
+                fieldsRegex,
+                `urls = {
+                        mediaUrl: result.url,
+                        directPath: result.direct_path,
+                        thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path,
+                        thumbnailSha256: result.thumbnail_info?.thumbnail_sha256,
+                        handle: result.handle,`
             );
             patched = true;
         }
         
         // 2. Fix the upload URL if newsletter
+        const funcSignatureRegex = /return\s+async\s*\(filePath,\s*\{\s*mediaType,\s*fileEncSha256B64,\s*timeoutMs\s*\}\)\s*=>\s*\{/;
+        if (funcSignatureRegex.test(content)) {
+            content = content.replace(
+                funcSignatureRegex,
+                'return async (filePath, { mediaType, fileEncSha256B64, timeoutMs, newsletter }) => {'
+            );
+            patched = true;
+        }
+
         const urlRegex = /const\s+url\s*=\s*\`https:\/\/\$\{hostname\}\$\{MEDIA_PATH_MAP\[mediaType\]\}\/\$\{fileEncSha256B64\}\?auth=\$\{auth\}&token=\$\{fileEncSha256B64\}\`;/;
         if (!content.includes('isNewsletterUrl') && urlRegex.test(content)) {
-            const replaceUrl = `const isNewsletterUrl = !!arguments[1].newsletter;
+            const replaceUrl = `const isNewsletterUrl = !!newsletter;
             const newsletterPath = MEDIA_PATH_MAP[mediaType] ? MEDIA_PATH_MAP[mediaType].replace('/mms/', '/newsletter/newsletter-') : '/newsletter/newsletter-document';
             let urlPath = isNewsletterUrl ? newsletterPath : MEDIA_PATH_MAP[mediaType];
             let url = \`https://\${hostname}\${urlPath}/\${fileEncSha256B64}?auth=\${auth}&token=\${fileEncSha256B64}\`;
-            if (isNewsletterUrl) url += "&server_thumb_gen=1";`;
+            if (isNewsletterUrl) {
+                url += "&server_thumb_gen=1";
+                if (mediaType === 'video' || mediaType === 'gif' || mediaType === 'ptv') {
+                    url += '&server_transcode=1';
+                }
+            }`;
             content = content.replace(urlRegex, replaceUrl);
             patched = true;
         }
@@ -97,7 +122,10 @@ try {
             ...uploadData,
             media: undefined,
         };
-        if (isNewsletter) mediaMsg.fileEncSha256 = fileSha256;
+        if (isNewsletter) {
+            delete mediaMsg.mediaKey;
+            delete mediaMsg.mediaKeyTimestamp;
+        }
         if (isNewsletter && handle) mediaMsg.mediaKeyDomain = handle;
         
         const obj = WAProto.Message.fromObject({`
