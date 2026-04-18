@@ -1,5 +1,11 @@
-## [v1.5.3] - 2026-04-08
+## [v1.5.3.1] - 2026-04-18
 
+### Fixed
+- **Newsletter Media Webhook Crash**: Fixed a critical issue where sending unencrypted media to a WhatsApp Newsletter would crash the webhook (`Cannot derive from empty media key`) by securely downloading the unencrypted file straight from the WhatsApp MMG servers using its `directPath`.
+
+---
+
+## [v1.5.3] - 2026-04-08
 ### Added
 - **WhatsApp Communities Support**: Added `isCommunity` and `linkedParentJid` to Group metadata schema, including automatic recognition and storage of Community structures during Group synchronization.
 - **Advanced Webhook Events**: Added `group.update`, `group.participant`, `message.edited`, and `message.deleted` events for real-time tracking of precise WhatsApp actions.
