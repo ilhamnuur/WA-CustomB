@@ -1,65 +1,157 @@
 #!/usr/bin/env node
 /**
- * Patch: Baileys Newsletter Media Fix (Stable Version)
+ * Patch: Baileys Newsletter Media Fix (PR #2434)
  * 
- * Fixes known bugs in @whiskeysockets/baileys for newsletter media:
- * 1. Captures 'handle' from upload response.
- * 2. Fixes directPath prefix (/o1/ -> /m1/).
- * 
- * This version is simplified to avoid 'Connection Closed' errors.
+ * Applies the full protocol fix required for newsletter media:
+ * 1. Newsletter media endpoint /newsletter/newsletter-* and server_thumb_gen=1
+ * 2. `url` set to null/undefined instead of URL
+ * 3. mediatype attribute set on plaintext node
+ * 4. fileEncSha256 mapped to fileSha256 for unencrypted media
+ * 5. Extracts and injects thumbnail data from upload response
  */
 
 const fs = require('fs');
 const path = require('path');
 
-const BAILEYS_DIR = path.join(__dirname, '..', 'node_modules', '@whiskeysockets', 'baileys', 'lib', 'Utils');
-const MESSAGES_JS = path.join(BAILEYS_DIR, 'messages.js');
-const MESSAGES_MEDIA_JS = path.join(BAILEYS_DIR, 'messages-media.js');
+const BAILEYS_DIR = path.join(__dirname, '..', 'node_modules', '@whiskeysockets', 'baileys', 'lib');
+const MESSAGES_JS = path.join(BAILEYS_DIR, 'Utils', 'messages.js');
+const MESSAGES_MEDIA_JS = path.join(BAILEYS_DIR, 'Utils', 'messages-media.js');
+const MESSAGES_SEND_JS = path.join(BAILEYS_DIR, 'Socket', 'messages-send.js');
 
 let patchCount = 0;
 
-// PATCH 1: Capture `handle` (messages-media.js)
 try {
     if (fs.existsSync(MESSAGES_MEDIA_JS)) {
         let content = fs.readFileSync(MESSAGES_MEDIA_JS, 'utf8');
-        if (content.includes('handle: result.handle')) {
-            console.log('[patch-baileys] ✅ Patch 1 already applied.');
-        } else {
-            const search = 'directPath: result.direct_path,';
-            const replace = 'directPath: result.direct_path,\n                        handle: result.handle,';
-            if (content.includes(search)) {
-                content = content.replace(search, replace);
-                fs.writeFileSync(MESSAGES_MEDIA_JS, content, 'utf8');
-                console.log('[patch-baileys] ✅ Patch 1 applied.');
-                patchCount++;
-            }
+        let patched = false;
+        
+        // 1. Add extra fields from result
+        const directPathRegex = /directPath:\s*result\.direct_path,/;
+        if (!content.includes('thumbnailDirectPath: result.thumbnail_direct_path') && directPathRegex.test(content)) {
+            content = content.replace(
+                directPathRegex,
+                'directPath: result.direct_path,\n                        thumbnailDirectPath: result.thumbnail_direct_path,\n                        thumbnailSha256: result.thumbnail_sha256,\n                        handle: result.handle,'
+            );
+            patched = true;
         }
-    }
-} catch (e) {}
+        
+        // 2. Fix the upload URL if newsletter
+        const urlRegex = /const\s+url\s*=\s*\`https:\/\/\$\{hostname\}\$\{MEDIA_PATH_MAP\[mediaType\]\}\/\$\{fileEncSha256B64\}\?auth=\$\{auth\}&token=\$\{fileEncSha256B64\}\`;/;
+        if (!content.includes('isNewsletterUrl') && urlRegex.test(content)) {
+            const replaceUrl = `const isNewsletterUrl = !!arguments[1].newsletter;
+            const newsletterPath = MEDIA_PATH_MAP[mediaType] ? MEDIA_PATH_MAP[mediaType].replace('/mms/', '/newsletter/newsletter-') : '/newsletter/newsletter-document';
+            let urlPath = isNewsletterUrl ? newsletterPath : MEDIA_PATH_MAP[mediaType];
+            let url = \`https://\${hostname}\${urlPath}/\${fileEncSha256B64}?auth=\${auth}&token=\${fileEncSha256B64}\`;
+            if (isNewsletterUrl) url += "&server_thumb_gen=1";`;
+            content = content.replace(urlRegex, replaceUrl);
+            patched = true;
+        }
 
-// PATCH 2: fix directPath (messages.js)
+        if (patched) {
+            fs.writeFileSync(MESSAGES_MEDIA_JS, content, 'utf8');
+            console.log('[patch-baileys] ✅ messages-media.js patched');
+            patchCount++;
+        }
+    } else {
+        console.warn('[patch-baileys] ⚠️ Target file not found: messages-media.js');
+    }
+} catch(e) {
+    console.error('[patch-baileys] ERROR patching messages-media.js:', e.message);
+}
+
 try {
     if (fs.existsSync(MESSAGES_JS)) {
         let content = fs.readFileSync(MESSAGES_JS, 'utf8');
-        if (content.includes('rawDirectPath')) {
-            console.log('[patch-baileys] ✅ Patch 2 already applied.');
+        let patched = false;
+
+        if (content.includes('const mediaMsg = {') && content.includes('thumbnailDirectPath: isNewsletter')) {
+           // Already patched heavily.
         } else {
-            const startMarker = 'const { filePath, fileSha256, fileLength } = await getRawMediaUploadData';
-            const search = 'const { mediaUrl, directPath } = await options.upload';
-            const replace = 'const { mediaUrl, directPath: rawDirectPath, handle } = await options.upload';
-            
-            if (content.includes(search)) {
-                content = content.replace(search, replace);
+            const originalUploadRegex = /const\s*\{\s*mediaUrl,\s*directPath\s*\}\s*=\s*await\s*options\.upload\(filePath,\s*\{/;
+            if (!content.includes('thumbnailDirectPath: isNewsletter') && originalUploadRegex.test(content)) {
+                // 3. Inject newsletter properties into options.upload
                 content = content.replace(
-                    'await fs.unlink(filePath);',
-                    'await fs.unlink(filePath);\n        const directPath = rawDirectPath && rawDirectPath.includes("/o1/") ? rawDirectPath.replace("/o1/", "/m1/") : rawDirectPath;'
+                    originalUploadRegex,
+                    `const { mediaUrl, directPath: rawDirectPath, thumbnailDirectPath, thumbnailSha256, handle } = await options.upload(filePath, {
+            newsletter: isNewsletter,`
                 );
-                fs.writeFileSync(MESSAGES_JS, content, 'utf8');
-                console.log('[patch-baileys] ✅ Patch 2 applied.');
-                patchCount++;
+                
+                // 4. Inject unlinking and directPath mapping
+                content = content.replace(
+                    /await\s*fs\.unlink\(filePath\);/,
+                    `await fs.unlink(filePath);
+        const directPath = (isNewsletter && rawDirectPath && rawDirectPath.includes('/o1/')) ? rawDirectPath.replace('/o1/', '/m1/') : rawDirectPath;`
+                );
+                
+                // 5. Replace message generation
+                const objCreationRegex = /const\s*obj\s*=\s*WAProto\.Message\.fromObject\(\{/;
+                content = content.replace(
+                    objCreationRegex,
+                    `const mediaMsg = {
+            url: isNewsletter ? undefined : mediaUrl,
+            directPath,
+            thumbnailDirectPath: isNewsletter ? thumbnailDirectPath : undefined,
+            thumbnailSha256: isNewsletter ? thumbnailSha256 : undefined,
+            fileSha256,
+            fileLength,
+            ...uploadData,
+            media: undefined,
+        };
+        if (isNewsletter) mediaMsg.fileEncSha256 = fileSha256;
+        if (isNewsletter && handle) mediaMsg.mediaKeyDomain = handle;
+        
+        const obj = WAProto.Message.fromObject({`
+                );
+                
+                const msgObjectRegex = /\[\`\$\{\w+\}Message\`\]:\s+MessageTypeProto\[\w+\]\.fromObject\(\{[^\}]+media:\s*undefined\s*\}\)/s;
+                content = content.replace(msgObjectRegex, '[`${mediaType}Message`]: MessageTypeProto[mediaType].fromObject(mediaMsg)');
+                
+                patched = true;
             }
         }
-    }
-} catch (e) {}
 
-if (patchCount > 0) console.log(`[patch-baileys] 🎉 ${patchCount} patch(es) applied.`);
+        if (patched) {
+            fs.writeFileSync(MESSAGES_JS, content, 'utf8');
+            console.log('[patch-baileys] ✅ messages.js patched');
+            patchCount++;
+        }
+    } else {
+        console.warn('[patch-baileys] ⚠️ Target file not found: messages.js');
+    }
+} catch(e) {
+    console.error('[patch-baileys] ERROR patching messages.js:', e.message);
+}
+
+try {
+    if (fs.existsSync(MESSAGES_SEND_JS)) {
+        let content = fs.readFileSync(MESSAGES_SEND_JS, 'utf8');
+        let patched = false;
+        
+        const searchSendRegex = /const\s*bytes\s*=\s*encodeNewsletterMessage\(patched\);\s*binaryNodeContent\.push\(\{\s*tag:\s*'plaintext',\s*attrs:\s*\{\},\s*content:\s*bytes\s*\}\);/s;
+        
+        if (!content.includes('pAttrs.mediatype') && searchSendRegex.test(content)) {
+            const replaceSend = `const bytes = encodeNewsletterMessage(patched);
+                const pAttrs = {};
+                if (mediaType) pAttrs.mediatype = mediaType;
+                binaryNodeContent.push({
+                    tag: 'plaintext',
+                    attrs: pAttrs,
+                    content: bytes
+                });`;
+            content = content.replace(searchSendRegex, replaceSend);
+            fs.writeFileSync(MESSAGES_SEND_JS, content, 'utf8');
+            console.log('[patch-baileys] ✅ messages-send.js patched');
+            patchCount++;
+        }
+    } else {
+        console.warn('[patch-baileys] ⚠️ Target file not found: messages-send.js');
+    }
+} catch(e) {
+    console.error('[patch-baileys] ERROR patching messages-send.js:', e.message);
+}
+
+if (patchCount > 0) {
+    console.log(`[patch-baileys] 🎉 \${patchCount} patch(es) applied successfully based on PR #2434.`);
+} else {
+    console.log(`[patch-baileys] ℹ️ All patches already applied or target files not found.`);
+}
