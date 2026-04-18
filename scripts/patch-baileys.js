@@ -33,11 +33,11 @@ try {
                 `if (result?.url || result?.direct_path) {`
             );
             
-            const fieldsRegex = /urls\s*=\s*\{\s*mediaUrl:\s*result\.url,\s*directPath:\s*result\.direct_path,/;
+            const fieldsRegex = /urls\s*=\s*\{\s*mediaUrl:\s*result\.url(?:\s*\|\|\s*result\.direct_path)?,\s*directPath:\s*result\.direct_path,/;
             content = content.replace(
                 fieldsRegex,
                 `urls = {
-                        mediaUrl: result.url || result.direct_path,
+                        mediaUrl: result.url,
                         directPath: result.direct_path,
                         thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path,
                         thumbnailSha256: result.thumbnail_info?.thumbnail_sha256,
