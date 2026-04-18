@@ -32,8 +32,9 @@ export async function POST(
         await ChatService.sendTextMessage(sessionId, jid, message, mentions);
 
         return NextResponse.json({ status: true, message: "Message sent successfully" });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Send message error:", error);
-        return NextResponse.json({ status: false, message: "Failed to send message", error: "Failed to send message" }, { status: 500 });
+        const errorMsg = error?.message || "Failed to send message";
+        return NextResponse.json({ status: false, message: errorMsg, error: errorMsg }, { status: 500 });
     }
 }
