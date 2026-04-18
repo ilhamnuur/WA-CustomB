@@ -97,7 +97,10 @@ try {
             ...uploadData,
             media: undefined,
         };
-        if (isNewsletter) mediaMsg.fileEncSha256 = fileSha256;
+        if (isNewsletter) {
+            delete mediaMsg.mediaKey;
+            delete mediaMsg.mediaKeyTimestamp;
+        }
         if (isNewsletter && handle) mediaMsg.mediaKeyDomain = handle;
         
         const obj = WAProto.Message.fromObject({`
