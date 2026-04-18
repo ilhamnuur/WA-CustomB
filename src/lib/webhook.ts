@@ -186,7 +186,12 @@ export async function downloadAndSaveMedia(message: WAMessage, sessionId: string
             
             if (mediaUrl) {
                 try {
-                    const res = await fetch(mediaUrl);
+                    const res = await fetch(mediaUrl, {
+                        headers: {
+                            'User-Agent': 'WhatsApp/2.22.24.81 A',
+                            'Accept': '*/*, image/*, video/*, audio/*'
+                        }
+                    });
                     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
                     buffer = Buffer.from(await res.arrayBuffer());
                 } catch (e) {
