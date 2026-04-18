@@ -42,7 +42,12 @@ try {
             const newsletterPath = MEDIA_PATH_MAP[mediaType] ? MEDIA_PATH_MAP[mediaType].replace('/mms/', '/newsletter/newsletter-') : '/newsletter/newsletter-document';
             let urlPath = isNewsletterUrl ? newsletterPath : MEDIA_PATH_MAP[mediaType];
             let url = \`https://\${hostname}\${urlPath}/\${fileEncSha256B64}?auth=\${auth}&token=\${fileEncSha256B64}\`;
-            if (isNewsletterUrl) url += "&server_thumb_gen=1";`;
+            if (isNewsletterUrl) {
+                url += "&server_thumb_gen=1";
+                if (mediaType === 'video' || mediaType === 'gif' || mediaType === 'ptv') {
+                    url += '&server_transcode=1';
+                }
+            }`;
             content = content.replace(urlRegex, replaceUrl);
             patched = true;
         }
