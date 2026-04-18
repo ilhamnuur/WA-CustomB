@@ -1,3 +1,12 @@
+## [v1.5.3.2] - 2026-04-19
+
+### Fixed
+- **[CRITICAL] Newsletter Media Upload Endpoint Failure**: Fixed an insidious ES6 Arrow Function scope binding bug in Baileys (`arguments[1].newsletter`) that caused Newsletter media payloads to bypass the `/newsletter/newsletter-*` CDN routes. All uploads are now guaranteed to travel through the unencrypted Channel CDN pipeline instead of the standard encrypted pathways, eliminating the `400 Bad Request` downloads.
+- **Mobile Client PNG Crash Recovery**: Added rigid server-side validation to the Media API, strictly blocking PNGs/non-JPEG formats on WhatsApp Channels. The API now gracefully returns an explicit UI error notification since the mobile WhatsApp UI natively crashes/rejects non-JPEG payloads injected directly to the channel unencrypted CDN.
+- **Webhook Connection Destructuring Error**: Removed unstable `sock.requestMediaConn()` function calls causing `500 Server Error` webhook panics during media retrieval failovers.
+
+---
+
 ## [v1.5.3.1] - 2026-04-18
 
 ### Fixed

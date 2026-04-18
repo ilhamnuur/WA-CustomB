@@ -30,6 +30,19 @@ export async function POST(
         }
 
         const decodedJid = decodeURIComponent(jid);
+
+        // WhatsApp Channel (Newsletter) strictly enforces JPEG format for images
+        // Sending PNGs or other formats will cause the Mobile client to crash/fail to load.
+        if (decodedJid.includes('@newsletter') && type === 'image' && file.type !== 'image/jpeg') {
+            return NextResponse.json(
+                { 
+                    status: false, 
+                    message: "WhatsApp Channels/Newsletters sementara waktu HANYA mendukung format gambar JPG/JPEG. Silakan gunakan format tersebut.", 
+                    error: "Unsupported media format for Newsletter" 
+                }, 
+                { status: 400 }
+            );
+        }
         const buffer = Buffer.from(await file.arrayBuffer());
 
         // Send via ChatService
