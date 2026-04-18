@@ -47,9 +47,18 @@ try {
         }
         
         // 2. Fix the upload URL if newsletter
+        const funcSignatureRegex = /return\s+async\s*\(filePath,\s*\{\s*mediaType,\s*fileEncSha256B64,\s*timeoutMs\s*\}\)\s*=>\s*\{/;
+        if (funcSignatureRegex.test(content)) {
+            content = content.replace(
+                funcSignatureRegex,
+                'return async (filePath, { mediaType, fileEncSha256B64, timeoutMs, newsletter }) => {'
+            );
+            patched = true;
+        }
+
         const urlRegex = /const\s+url\s*=\s*\`https:\/\/\$\{hostname\}\$\{MEDIA_PATH_MAP\[mediaType\]\}\/\$\{fileEncSha256B64\}\?auth=\$\{auth\}&token=\$\{fileEncSha256B64\}\`;/;
         if (!content.includes('isNewsletterUrl') && urlRegex.test(content)) {
-            const replaceUrl = `const isNewsletterUrl = !!arguments[1].newsletter;
+            const replaceUrl = `const isNewsletterUrl = !!newsletter;
             const newsletterPath = MEDIA_PATH_MAP[mediaType] ? MEDIA_PATH_MAP[mediaType].replace('/mms/', '/newsletter/newsletter-') : '/newsletter/newsletter-document';
             let urlPath = isNewsletterUrl ? newsletterPath : MEDIA_PATH_MAP[mediaType];
             let url = \`https://\${hostname}\${urlPath}/\${fileEncSha256B64}?auth=\${auth}&token=\${fileEncSha256B64}\`;

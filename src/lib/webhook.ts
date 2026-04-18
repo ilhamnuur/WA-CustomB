@@ -182,57 +182,14 @@ export async function downloadAndSaveMedia(message: WAMessage, sessionId: string
             logger.info("Media", "Downloading unencrypted media (newsletter)...");
 
             try {
-                // Import waManager
-                const { waManager } = await import("@/modules/whatsapp/manager");
-                const instance = waManager.getInstance(sessionId);
-
-                if (!instance?.socket) {
-                    throw new Error(`No active socket for session: ${sessionId}`);
-                }
-
-                const sock = instance.socket as any;
-
-                // Ambil media connection dengan auth token aktif
-                const mediaConn = await sock.requestMediaConn();
-
-                if (!mediaConn?.auth) {
-                    throw new Error("Failed to get mediaConn auth token");
-                }
-
-                // Tentukan directPath — prioritaskan /m1/ path
-                let directPath: string = mediaObj.directPath || "";
-                if (directPath.includes('/o1/')) {
-                    directPath = directPath.replace('/o1/', '/m1/');
-                    logger.info("Media", `Fixed directPath /o1/ → /m1/`);
-                }
-
-                // Pilih host terbaik dari mediaConn
-                const host = mediaConn.hosts?.[0]?.hostname || "mmg.whatsapp.net";
-                const auth = mediaConn.auth;
-
-                // Bangun URL dengan auth token
-                const sep = directPath.includes('?') ? '&' : '?';
-                const mediaUrl = `https://${host}${directPath}${sep}auth=${auth}&token=${auth}`;
-
-                logger.info("Media", `Fetching newsletter media from: ${host}`);
-
-                const res = await fetch(mediaUrl, {
-                    headers: {
-                        'User-Agent': 'WhatsApp/2.23.20.0 N',
-                        'Accept': '*/*',
-                    },
-                    signal: AbortSignal.timeout(15000)
-                });
-
-                if (!res.ok) {
-                    throw new Error(`HTTP ${res.status} ${res.statusText}`);
-                }
-
-                buffer = Buffer.from(await res.arrayBuffer());
-                logger.info("Media", `Newsletter media fetched successfully: ${buffer.length} bytes`);
-
+                // Use downloadMediaMessage — Baileys handles auth headers automatically
+                buffer = await downloadMediaMessage(
+                    message,
+                    "buffer",
+                    {}
+                ) as Buffer;
             } catch (e) {
-                logger.error("Media", "Failed to download newsletter media:", e);
+                logger.error("Media", "Failed to download newsletter media via Baileys:", e);
                 return null;
             }
         } else {
