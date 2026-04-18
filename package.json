@@ -1,6 +1,6 @@
 {
   "name": "wa-akg",
-  "version": "1.5.3",
+  "version": "1.5.3.1",
   "private": false,
   "scripts": {
     "dev": "npx tsx src/server/index.ts",
@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:push": "prisma db push && prisma generate",
     "db:studio": "prisma studio",
-    "make-admin": "node scripts/setup-admin.js"
+    "make-admin": "node scripts/setup-admin.js",
+    "postinstall": "node scripts/patch-baileys.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
