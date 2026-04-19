@@ -1,6 +1,6 @@
 {
   "name": "wa-akg",
-  "version": "1.5.3.2",
+  "version": "1.5.3.3",
   "private": false,
   "scripts": {
     "dev": "npx tsx src/server/index.ts",
@@ -10,7 +10,7 @@
     "db:push": "prisma db push && prisma generate",
     "db:studio": "prisma studio",
     "make-admin": "node scripts/setup-admin.js",
-    "postinstall": "node scripts/patch-baileys.js"
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -74,6 +74,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "next-swagger-doc": "^0.4.1",
+    "patch-package": "^8.0.1",
+    "postinstall-postinstall": "^2.1.0",
     "swagger-ui-react": "^5.31.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",

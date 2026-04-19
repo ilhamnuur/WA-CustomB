@@ -177,27 +177,44 @@ export async function downloadAndSaveMedia(message: WAMessage, sessionId: string
         let buffer: Buffer | null = null;
         const mediaObj = (messageContent as any)[messageType];
 
-        // Newsletter media is not encrypted and doesn't have a mediaKey
-        if (!mediaObj.mediaKey && (mediaObj.url || mediaObj.directPath)) {
-            logger.info("Media", "Downloading unencrypted media (newsletter)...");
+        // Newsletter media is NOT encrypted — no mediaKey present
+        const isNewsletterMedia = !mediaObj.mediaKey && (mediaObj.directPath || mediaObj.thumbnailDirectPath);
+
+        if (isNewsletterMedia) {
+            logger.info("Media", "Downloading unencrypted media (newsletter) via direct fetch...");
+
+            const dp = mediaObj.directPath || mediaObj.thumbnailDirectPath;
+            const downloadUrl = dp.startsWith('http') ? dp : `https://mmg.whatsapp.net${dp}`;
 
             try {
-                // Use downloadMediaMessage — Baileys handles auth headers automatically
+                const res = await fetch(downloadUrl, {
+                    method: 'GET',
+                    headers: { 'Origin': 'https://web.whatsapp.com' }
+                });
+
+                if (!res.ok) {
+                    logger.error("Media", `Newsletter media HTTP ${res.status} ${res.statusText} for URL: ${downloadUrl}`);
+                    return null;
+                }
+
+                buffer = Buffer.from(await res.arrayBuffer());
+                logger.success("Media", `Newsletter media downloaded: ${buffer.length} bytes`);
+            } catch (e) {
+                logger.error("Media", "Failed to download newsletter media:", e);
+                return null;
+            }
+        } else {
+            // Regular encrypted media — use Baileys downloadMediaMessage
+            try {
                 buffer = await downloadMediaMessage(
                     message,
                     "buffer",
                     {}
                 ) as Buffer;
             } catch (e) {
-                logger.error("Media", "Failed to download newsletter media via Baileys:", e);
+                logger.error("Media", "Failed to download encrypted media:", e);
                 return null;
             }
-        } else {
-            buffer = await downloadMediaMessage(
-                message,
-                "buffer",
-                {}
-            ) as Buffer;
         }
 
         if (!buffer) {
