@@ -1,3 +1,10 @@
+## [v1.5.3.3] - 2026-04-19
+
+### Fixed
+- **Newsletter Media Native Patch**: Migrated from custom manual `patch-baileys.js` script to the standardized `patch-package` system. This makes the newsletter media unencrypted download fix (which resolves the persistent "HTTP 400 Bad Request" when downloading WhatsApp Channel media) native to the package manager, ensuring it safely persists across future `npm install` or deployment cycles.
+
+---
+
 ## [v1.5.3.2] - 2026-04-19
 
 ### Fixed
