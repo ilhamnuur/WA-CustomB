@@ -1,19 +1,19 @@
-import { NextResponse, NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { waManager } from "@/modules/whatsapp/manager";
 import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
-export async function GET(
-    request: NextRequest,
-    { params }: { params: Promise<{ sessionId: string }> }
-) {
+export const dynamic = 'force-dynamic';
+
+export const GET = auth(async (req, { params }) => {
     try {
-        const user = await getAuthenticatedUser(request);
+        const user = await getAuthenticatedUser(req as any);
         if (!user) {
             return NextResponse.json({ status: false, message: "Unauthorized", error: "Unauthorized" }, { status: 401 });
         }
 
-        const resolvedParams = await params;
+        const resolvedParams = await (params as any);
         const sessionId = resolvedParams.sessionId;
 
         // Verify access
@@ -75,4 +75,4 @@ export async function GET(
         console.error("Get session details error:", error);
         return NextResponse.json({ status: false, message: "Internal Server Error", error: "Internal Server Error" }, { status: 500 });
     }
-}
+}) as any;

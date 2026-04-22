@@ -10,12 +10,27 @@ export async function getAuthenticatedUserForAction() {
     try {
         const session = await auth();
         
-        if (session?.user?.id) {
-            // Fetch full user data including role to ensure it's up to date
-            const user = await prisma.user.findUnique({
-                where: { id: session.user.id },
+        if (session?.user?.id || (session?.user as any)?.email) {
+            const userId = session.user.id;
+            const userEmail = (session.user as any).email;
+
+            // First try ID
+            let user = userId ? await prisma.user.findUnique({
+                where: { id: userId },
                 select: { id: true, email: true, name: true, role: true }
-            });
+            }) : null;
+
+            // Fallback to Email (resolves stale IDs)
+            if (!user && userEmail) {
+                user = await prisma.user.findUnique({
+                    where: { email: userEmail },
+                    select: { id: true, email: true, name: true, role: true }
+                });
+                
+                if (user) {
+                    logger.debug("Auth", "Recovered server action session via email fallback:", userEmail);
+                }
+            }
 
             if (user) {
                 return user;

@@ -39,26 +39,88 @@ export async function validateApiKey(request: NextRequest) {
  * Get authenticated user from either session or API key
  */
 export async function getAuthenticatedUser(request?: NextRequest) {
-    // First try API key if request is provided
+    // 1. Try API key if request is provided
     if (request) {
         const apiKeyUser = await validateApiKey(request);
         if (apiKeyUser) {
+            logger.debug("Auth", "Authenticated via API Key:", apiKeyUser.email);
             return { ...apiKeyUser, authMethod: "apiKey" as const };
         }
     }
 
-    // Fall back to session auth
-    const session = await auth();
-    if (session?.user?.id) {
-        // Fetch full user data including role
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { id: true, email: true, name: true, role: true }
-        });
+    // 2. Fall back to session auth
+    try {
+        let userId: string | undefined;
+        let userEmail: string | undefined;
 
-        if (user) {
-            return { ...user, authMethod: "session" as const };
+        // A. Check if session is already provided by auth() wrapper (most efficient)
+        if ((request as any)?.auth?.user) {
+            userId = (request as any).auth.user.id;
+            userEmail = (request as any).auth.user.email;
+            logger.debug("Auth", "Using session from auth() wrapper context");
+        } 
+        
+        // B. Fallback: Try getting token directly (most reliable for POST/Middleware/Proxy)
+        if (!userId && request) {
+            try {
+                const { getToken } = await import("next-auth/jwt");
+                const token = await getToken({ 
+                    req: request, 
+                    secret: process.env.AUTH_SECRET,
+                    raw: false
+                });
+                
+                if (token) {
+                    userId = token.id as string;
+                    userEmail = token.email as string;
+                    logger.debug("Auth", "Authenticated via direct JWT Token lookup");
+                }
+            } catch (tokenError) {
+                logger.error("Auth", "JWT getToken error:", tokenError);
+            }
         }
+
+        // C. Last resort: Try standard auth() (uses next/headers)
+        if (!userId) {
+            const session = await auth();
+            if (session?.user) {
+                userId = session.user.id;
+                userEmail = session.user.email as string;
+                logger.debug("Auth", "Authenticated via standard auth() helper");
+            }
+        }
+
+        // 3. Resolve user from database
+        if (userId || userEmail) {
+            // First try ID
+            let user = userId ? await prisma.user.findUnique({
+                where: { id: userId },
+                select: { id: true, email: true, name: true, role: true }
+            }) : null;
+
+            // Fallback to Email (resolves stale IDs)
+            if (!user && userEmail) {
+                user = await prisma.user.findUnique({
+                    where: { email: userEmail },
+                    select: { id: true, email: true, name: true, role: true }
+                });
+                
+                if (user) {
+                    logger.debug("Auth", "Recovered stale session via email fallback:", userEmail);
+                }
+            }
+
+            if (user) {
+                logger.debug("Auth", "Successfully authenticated user:", user.email);
+                return { ...user, authMethod: "session" as const };
+            } else {
+                logger.warn("Auth", "User not found in database for provided credentials:", { userId, userEmail });
+            }
+        }
+        
+        logger.debug("Auth", "No valid authentication found (Session/JWT/API Key)");
+    } catch (authError) {
+        logger.error("Auth", "Unexpected error in getAuthenticatedUser:", authError);
     }
 
     return null;
