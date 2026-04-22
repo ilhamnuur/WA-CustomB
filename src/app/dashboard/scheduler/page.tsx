@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Plus, CalendarClock, RefreshCw } from "lucide-react";
+import { Trash2, Plus, CalendarClock, RefreshCw, Users, User, Send, Info, Clock, Repeat, AlertCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import moment from "moment-timezone";
 import {
@@ -23,6 +23,7 @@ import {
 import { SearchFilter } from "@/components/dashboard/search-filter";
 import { useSession } from "@/components/dashboard/session-provider";
 import { SessionGuard } from "@/components/dashboard/session-guard";
+import { Badge } from "@/components/ui/badge";
 
 interface ScheduledMessage {
     id: string;
@@ -32,24 +33,27 @@ interface ScheduledMessage {
     status: string;
     mediaUrl?: string;
     mediaType?: string;
+    type: string;
+    scheduleType: string;
 }
 
 export default function SchedulerPage() {
     const { sessionId: selectedSessionId } = useSession();
 
-    // ... rest of state
     const [messages, setMessages] = useState<ScheduledMessage[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [systemTimezone, setSystemTimezone] = useState("Asia/Jakarta");
 
-    // Form state ...
+    // Form state
     const [showForm, setShowForm] = useState(false);
     const [newJid, setNewJid] = useState("");
     const [newContent, setNewContent] = useState("");
     const [newSendAt, setNewSendAt] = useState("");
     const [newMediaUrl, setNewMediaUrl] = useState("");
     const [newMediaType, setNewMediaType] = useState("image");
+    const [newType, setNewType] = useState("individual");
+    const [newScheduleType, setNewScheduleType] = useState("once");
 
     // Delete state
     const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -57,10 +61,7 @@ export default function SchedulerPage() {
     // Edit state
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    // Remove local updateSession logic as it is handled by provider
-
     useEffect(() => {
-        // Fetch system timezone
         fetch('/api/settings/system')
             .then(res => res.json())
             .then(data => {
@@ -96,13 +97,13 @@ export default function SchedulerPage() {
 
     const handleEdit = (msg: ScheduledMessage) => {
         setEditingId(msg.id);
-        const jidUser = msg.jid.split('@')[0];
-        setNewJid(jidUser);
+        setNewJid(msg.jid.split('@')[0]);
         setNewContent(msg.content);
         setNewMediaUrl(msg.mediaUrl || "");
         setNewMediaType(msg.mediaType || "image");
+        setNewType(msg.type || "individual");
+        setNewScheduleType(msg.scheduleType || "once");
 
-        // Format date for datetime-local input using correct system timezone
         const localIso = moment.tz(msg.sendAt, systemTimezone).format('YYYY-MM-DDTHH:mm');
         setNewSendAt(localIso);
 
@@ -112,10 +113,9 @@ export default function SchedulerPage() {
     const handleSaveSchedule = async () => {
         if (!selectedSessionId || !newJid || !newContent || !newSendAt) return;
 
-        // Append domain if missing
         let jid = newJid;
-        if (!jid.includes("@")) {
-            jid = jid + "@s.whatsapp.net"; // Default to private chat
+        if (newType === 'individual' && !jid.includes("@")) {
+            jid = jid.includes("-") ? `${jid}@g.us` : `${jid}@s.whatsapp.net`;
         }
 
         try {
@@ -133,26 +133,34 @@ export default function SchedulerPage() {
                     content: newContent,
                     sendAt: newSendAt,
                     mediaUrl: newMediaUrl,
-                    mediaType: newMediaType
+                    mediaType: newMediaType,
+                    type: newType,
+                    scheduleType: newScheduleType
                 })
             });
 
             if (res.ok) {
                 toast.success(editingId ? "Schedule updated" : "Message scheduled");
                 setShowForm(false);
-                setNewJid("");
-                setNewContent("");
-                setNewSendAt("");
-                setNewMediaUrl("");
-                setNewMediaType("image");
-                setEditingId(null);
+                resetForm();
                 fetchMessages(selectedSessionId);
             } else {
-                toast.error(editingId ? "Failed to update schedule" : "Failed to schedule message");
+                toast.error("Failed to save schedule");
             }
         } catch (error) {
             toast.error("An error occurred");
         }
+    };
+
+    const resetForm = () => {
+        setNewJid("");
+        setNewContent("");
+        setNewSendAt("");
+        setNewMediaUrl("");
+        setNewMediaType("image");
+        setNewType("individual");
+        setNewScheduleType("once");
+        setEditingId(null);
     };
 
     const confirmDelete = async () => {
@@ -166,7 +174,7 @@ export default function SchedulerPage() {
                 toast.error("Failed to cancel schedule");
             }
         } catch (error) {
-            toast.error("Failed to cancel schedule");
+            toast.error("An error occurred");
         } finally {
             setDeleteId(null);
         }
@@ -174,7 +182,7 @@ export default function SchedulerPage() {
 
     const filteredMessages = messages.filter(m =>
         m.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.jid.includes(searchTerm)
+        m.jid.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -182,102 +190,97 @@ export default function SchedulerPage() {
             <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
-                        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-                            <CalendarClock className="h-5 w-5 sm:h-6 sm:w-6" /> Scheduler
+                        <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <CalendarClock className="h-6 w-6 text-primary" /> Automation Scheduler
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            {selectedSessionId ? "Schedule messages for active session." : "Select a session from the top bar."}
+                            Manage message cycles and automated blasts.
                         </p>
                     </div>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => selectedSessionId && fetchMessages(selectedSessionId)} disabled={loading || !selectedSessionId}>
-                            <RefreshCw className={`h-4 w-4 mr-1 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
+                        <Button variant="outline" size="sm" onClick={() => selectedSessionId && fetchMessages(selectedSessionId)} disabled={loading || !selectedSessionId}>
+                            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                             Refresh
                         </Button>
-                        <Button size="sm" className="flex-1 sm:flex-none" onClick={() => {
-                            setEditingId(null);
-                            setNewJid("");
-                            setNewContent("");
-                            setNewSendAt("");
-                            setNewMediaUrl("");
-                            setNewMediaType("image");
-                            setShowForm(!showForm);
-                        }} disabled={!selectedSessionId}>
-                            <Plus className="h-4 w-4 mr-1 sm:mr-2" /> Schedule
+                        <Button size="sm" onClick={() => { resetForm(); setShowForm(!showForm); }} disabled={!selectedSessionId}>
+                            <Plus className="h-4 w-4 mr-2" /> New Task
                         </Button>
                     </div>
                 </div>
 
-                <SearchFilter
-                    placeholder="Search schedules..."
-                    onSearch={setSearchTerm}
-                />
-
-                {/* New/Edit Schedule Form */}
                 {showForm && (
-                    <Card className="border-2 border-primary/20">
-                        <CardHeader>
-                            <CardTitle>{editingId ? "Edit Scheduled Message" : "Schedule New Message"}</CardTitle>
+                    <Card className="border-2 border-primary/10 shadow-lg animate-in slide-in-from-top duration-300">
+                        <CardHeader className="bg-muted/30">
+                            <CardTitle className="text-lg">{editingId ? "Edit Task" : "Create New Automated Task"}</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                                <div className="space-y-2">
-                                    <Label>Recipient JID</Label>
-                                    <div className="flex gap-2">
-                                        <Select onValueChange={(val) => {
-                                            if (val === "GROUP" && !newJid.endsWith("@g.us")) setNewJid(newJid + "@g.us");
-                                            if (val === "PRIVATE" && !newJid.endsWith("@s.whatsapp.net")) setNewJid(newJid + "@s.whatsapp.net");
-                                            if (val === "NEWSLETTER" && !newJid.endsWith("@newsletter")) setNewJid(newJid + "@newsletter");
-                                        }}>
-                                            <SelectTrigger className="w-[120px]">
-                                                <SelectValue placeholder="Type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="PRIVATE">Private</SelectItem>
-                                                <SelectItem value="GROUP">Group</SelectItem>
-                                                <SelectItem value="NEWSLETTER">Channel</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <Input
-                                            value={newJid}
-                                            onChange={e => setNewJid(e.target.value)}
-                                            placeholder="e.g. 62812345678@s.whatsapp.net"
-                                            className="flex-1"
-                                        />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Select type to auto-append suffix, or type full JID.</p>
+                        <CardContent className="space-y-4 pt-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2 col-span-1">
+                                    <Label>Task Type</Label>
+                                    <Select value={newType} onValueChange={setNewType}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="individual">Individual / Group JID</SelectItem>
+                                            <SelectItem value="blast">Broadcast to Contact Tag</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Send At</Label>
+                                <div className="space-y-2 col-span-1 md:col-span-2">
+                                    <Label>{newType === 'blast' ? 'Target Tag' : 'Recipient JID / Phone'}</Label>
                                     <Input
-                                        type="datetime-local"
-                                        value={newSendAt}
-                                        onChange={e => setNewSendAt(e.target.value)}
+                                        value={newJid}
+                                        onChange={e => setNewJid(e.target.value)}
+                                        placeholder={newType === 'blast' ? "e.g. CUSTOMER_VIP" : "e.g. 628123456789 or group-id"}
                                     />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {newType === 'blast' 
+                                            ? "Messages will be sent to all contacts with this tag." 
+                                            : "Enter full phone number or WhatsApp group ID."}
+                                    </p>
                                 </div>
                             </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Start Time</Label>
+                                    <Input type="datetime-local" value={newSendAt} onChange={e => setNewSendAt(e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Repetition Cycle</Label>
+                                    <Select value={newScheduleType} onValueChange={setNewScheduleType}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="once">Once (One-time delivery)</SelectItem>
+                                            <SelectItem value="every_day">Daily (Every 24 hours)</SelectItem>
+                                            <SelectItem value="working_days">Working Days (Mon - Fri)</SelectItem>
+                                            <SelectItem value="holidays">Weekends (Sat - Sun)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
-                                <Label>Message</Label>
+                                <Label>Message Content</Label>
                                 <Textarea
                                     value={newContent}
                                     onChange={e => setNewContent(e.target.value)}
-                                    placeholder="Hello there!"
+                                    placeholder="Type your message here..."
                                     rows={4}
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label>Media URL (Optional)</Label>
-                                    <Input
-                                        value={newMediaUrl}
-                                        onChange={e => setNewMediaUrl(e.target.value)}
-                                        placeholder="https://example.com/image.jpg"
-                                    />
+                                    <Label>Media Attachment URL (Optional)</Label>
+                                    <Input value={newMediaUrl} onChange={e => setNewMediaUrl(e.target.value)} placeholder="https://..." />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Media Type</Label>
+                                    <Label>Attachment Type</Label>
                                     <Select value={newMediaType} onValueChange={setNewMediaType}>
                                         <SelectTrigger>
                                             <SelectValue />
@@ -290,73 +293,91 @@ export default function SchedulerPage() {
                                     </Select>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="ghost" onClick={() => {
-                                    setShowForm(false);
-                                    setEditingId(null);
-                                    setNewJid("");
-                                    setNewContent("");
-                                    setNewSendAt("");
-                                    setNewMediaUrl("");
-                                    setNewMediaType("image");
-                                }}>Cancel</Button>
-                                <Button onClick={handleSaveSchedule}>{editingId ? "Update" : "Schedule"}</Button>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button variant="ghost" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
+                                <Button onClick={handleSaveSchedule} className="px-8">{editingId ? "Update Task" : "Start Task"}</Button>
                             </div>
                         </CardContent>
                     </Card>
                 )}
 
-                {/* Messages List */}
+                <SearchFilter placeholder="Search tasks by content or target..." onSearch={setSearchTerm} />
+
                 {loading ? (
-                    <div className="text-center p-8">Loading...</div>
+                    <div className="flex justify-center p-12"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>
                 ) : filteredMessages.length === 0 ? (
-                    <div className="text-center p-8 text-muted-foreground border rounded-lg bg-slate-50">
-                        {selectedSessionId ? "No scheduled messages found matching criteria." : "No session selected."}
-                    </div>
+                    <Card className="bg-muted/20 border-dashed border-2">
+                        <CardContent className="h-40 flex flex-col items-center justify-center text-muted-foreground">
+                            <Info className="h-8 w-8 mb-2 opacity-20" />
+                            <p>No active scheduled tasks found.</p>
+                        </CardContent>
+                    </Card>
                 ) : (
                     <div className="grid gap-4">
                         {filteredMessages.map(msg => (
-                            <Card key={msg.id} className={msg.status === 'SENT' ? 'opacity-70' : ''}>
-                                <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-3 sm:p-4">
-                                    <div>
-                                        <div className="font-bold flex items-center gap-2">
-                                            {msg.jid.split('@')[0]}
-                                            <span className={`text-xs px-2 py-0.5 rounded font-normal ${msg.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                                                msg.status === 'SENT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                }`}>
-                                                {msg.status}
-                                            </span>
+                            <Card key={msg.id} className={`overflow-hidden transition-all hover:shadow-md ${msg.status === 'SENT' ? 'bg-muted/10 opacity-75' : ''}`}>
+                                <div className={`h-1 w-full ${
+                                    msg.status === 'PENDING' ? 'bg-yellow-400' : 
+                                    msg.status === 'SENT' ? 'bg-green-500' : 
+                                    msg.status === 'SENDING' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'
+                                }`} />
+                                <CardContent className="p-4">
+                                    <div className="flex flex-col md:flex-row justify-between gap-4">
+                                        <div className="flex-1 space-y-2">
+                                            <div className="flex items-center flex-wrap gap-2">
+                                                <Badge variant={msg.type === 'blast' ? "default" : "outline"} className="flex gap-1 items-center font-bold">
+                                                    {msg.type === 'blast' ? <Users size={12} /> : <User size={12} />}
+                                                    {msg.type.toUpperCase()}
+                                                </Badge>
+                                                <span className="font-mono text-sm text-primary font-bold">
+                                                    {msg.jid.split('@')[0]}
+                                                </span>
+                                                <Badge variant="secondary" className="text-[10px] uppercase font-bold">
+                                                    {msg.status}
+                                                </Badge>
+                                            </div>
+                                            
+                                            <p className="text-sm line-clamp-2">{msg.content}</p>
+                                            
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground font-medium">
+                                                <span className="flex items-center gap-1"><Clock size={12} /> {new Date(msg.sendAt).toLocaleString()}</span>
+                                                <span className="flex items-center gap-1 uppercase tracking-wider"><Repeat size={12} /> {msg.scheduleType?.replace('_', ' ')}</span>
+                                            </div>
                                         </div>
-                                        <div className="text-sm font-medium mt-1">{msg.content}</div>
-                                        <div className="text-xs text-muted-foreground mt-1">
-                                            Scheduled for: {new Date(msg.sendAt).toLocaleString()}
+                                        
+                                        <div className="flex md:flex-col justify-end gap-2 shrink-0">
+                                            <Button variant="outline" size="sm" onClick={() => handleEdit(msg)} disabled={msg.status === 'SENDING'}>
+                                                Edit
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={() => setDeleteId(msg.id)} title="Cancel" className="text-destructive hover:bg-red-50">
+                                                <Trash2 size={16} />
+                                            </Button>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="ghost" size="sm" onClick={() => handleEdit(msg)} disabled={msg.status !== 'PENDING'}>
-                                            Edit
-                                        </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => setDeleteId(msg.id)} className="text-destructive hover:text-destructive hover:bg-red-50">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
+                                    {msg.status === 'FAILED' && (
+                                        <div className="mt-3 p-2 bg-red-50 rounded border border-red-100 flex items-start gap-2">
+                                            <AlertCircle size={14} className="text-red-500 mt-0.5" />
+                                            <span className="text-[10px] text-red-600 font-medium">Error: {(msg as any).errorMessage || 'Unknown failure'}</span>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         ))}
                     </div>
                 )}
 
-                <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+                <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Cancel Schedule?</AlertDialogTitle>
+                            <AlertDialogTitle>Delete Task?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                This will permanently delete this scheduled message.
+                                Are you sure you want to cancel and delete this scheduled task?
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                            <AlertDialogCancel>Close</AlertDialogCancel>
-                            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+                            <AlertDialogCancel>Keep Task</AlertDialogCancel>
+                            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Delete Permanently</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>

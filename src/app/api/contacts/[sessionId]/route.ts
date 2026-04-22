@@ -1,20 +1,16 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { batchResolveToPhoneJid } from "@/lib/jid-utils";
 import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
+import { auth } from "@/lib/auth";
 
-export async function GET(
-    req: NextRequest,
-    { params }: { params: Promise<{ sessionId: string }> }
-) {
+export const GET = auth(async (req, { params }) => {
     try {
-        const user = await getAuthenticatedUser(req);
+        const user = await getAuthenticatedUser(req as any);
         if (!user) {
             return NextResponse.json({ status: false, message: "Unauthorized", error: "Unauthorized" }, { status: 401 });
         }
 
-        const { sessionId } = await params;
+        const { sessionId } = await (params as any);
         const { searchParams } = new URL(req.url);
         const page = parseInt(searchParams.get("page") || "1");
         const limitParam = searchParams.get("limit") || "10";
@@ -44,11 +40,11 @@ export async function GET(
 
         if (search) {
             where.OR = [
-                { name: { contains: search } },
-                { notify: { contains: search } },
-                { verifiedName: { contains: search } },
-                { jid: { contains: search } },
-                { remoteJidAlt: { contains: search } }
+                { name: { contains: search, mode: 'insensitive' } },
+                { notify: { contains: search, mode: 'insensitive' } },
+                { verifiedName: { contains: search, mode: 'insensitive' } },
+                { jid: { contains: search, mode: 'insensitive' } },
+                { remoteJidAlt: { contains: search, mode: 'insensitive' } }
             ];
         }
 
@@ -57,11 +53,6 @@ export async function GET(
                 where,
                 ...(isAll ? {} : { skip: (page - 1) * limit, take: limit }),
                 orderBy: { name: 'asc' },
-                include: {
-                    _count: {
-                        select: { messages: true }
-                    }
-                }
             }),
             prisma.contact.count({ where })
         ]);
@@ -81,4 +72,4 @@ export async function GET(
         console.error("Error fetching contacts:", error);
         return NextResponse.json({ status: false, message: "Internal Server Error", error: "Internal Server Error" }, { status: 500 });
     }
-}
+}) as any;

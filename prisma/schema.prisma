@@ -72,6 +72,7 @@ model Session {
   webhooks    Webhook[]
   botConfig   BotConfig?
   sessionAccesses SessionAccess[]
+  phoneBook   PhoneBook[]
 }
 
 model Contact {
@@ -94,6 +95,20 @@ model Contact {
   @@unique([sessionId, jid])
 }
 
+model PhoneBook {
+  id          String   @id @default(cuid())
+  sessionId   String
+  name        String?
+  number      String   // Phone sequence
+  jid         String?  // Resolved Jid (@s.whatsapp.net)
+  category    String?
+  tags        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
 model Message {
   id          String        @id @default(cuid())
   sessionId   String
@@ -111,7 +126,7 @@ model Message {
   quoteId     String?       // For replies
   
   contactId   String?
-  contract    Contact?      @relation(fields: [contactId], references: [id])
+  contact     Contact?      @relation(fields: [contactId], references: [id])
   session     Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, keyId])
@@ -176,13 +191,17 @@ model Story {
 model ScheduledMessage {
   id          String   @id @default(cuid())
   sessionId   String
-  jid         String
+  jid         String   // recipient JID or Custom Group Name
   content     String   @db.Text
   mediaUrl    String?
   mediaType   String?  // image, video, document, etc.
   sendAt      DateTime
-  status      String   @default("PENDING") // PENDING, SENT, FAILED
+  status      String   @default("PENDING") // PENDING, SENT, FAILED, SENDING
+  type        String   @default("individual") // individual, blast
+  scheduleType String  @default("once") // once, every_day, working_days, holidays
+  errorMessage String? @db.Text
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

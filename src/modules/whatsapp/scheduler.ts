@@ -2,75 +2,132 @@ import { prisma } from "@/lib/prisma";
 import { waManager } from "./manager";
 import { logger } from "@/lib/logger";
 
+async function getBlastRecipients(sessionId: string, tagName: string) {
+    const contacts = await prisma.phoneBook.findMany({
+        where: {
+            sessionId: sessionId,
+            tags: {
+                contains: tagName,
+                mode: 'insensitive'
+            }
+        },
+        select: { jid: true }
+    });
+    return contacts.map(c => c.jid).filter(Boolean) as string[];
+}
+
 const checkScheduledMessages = async () => {
     try {
         const now = new Date();
-        logger.debug("Scheduler", `Checking for messages due before ${now.toISOString()}...`);
+        //logger.debug("Scheduler", `Checking due messages...`);
 
         const pendingMessages = await prisma.scheduledMessage.findMany({
             where: {
-                status: "PENDING",
+                status: { in: ["PENDING", "SENDING"] },
                 sendAt: { lte: now }
             }
         });
 
-        if (pendingMessages.length > 0) {
-            logger.info("Scheduler", `Found ${pendingMessages.length} pending messages.`);
-        }
+        if (pendingMessages.length === 0) return;
+
+        logger.info("Scheduler", `Processing ${pendingMessages.length} messages.`);
 
         for (const msg of pendingMessages) {
             const instance = waManager.getInstance(msg.sessionId);
 
-            if (instance?.socket) {
-                try {
-                    let content: any = {};
-                    // Simple text support for now, expand for media later
-                    if (msg.mediaUrl) {
-                        const url = msg.mediaUrl;
-                        const type = msg.mediaType || 'image'; // Default to image if null
+            if (!instance?.socket) {
+                logger.warn("Scheduler", `Session ${msg.sessionId} not active for msg ${msg.id}`);
+                continue;
+            }
 
-                        if (type === 'video') {
-                            content = { video: { url }, caption: msg.content };
-                        } else if (type === 'document') {
-                            content = { document: { url }, caption: msg.content, fileName: 'file', mimetype: 'application/octet-stream' };
-                        } else {
-                            content = { image: { url }, caption: msg.content };
-                        }
-                    } else {
-                        content = { text: msg.content };
-                    }
+            try {
+                // Mark as SENDING to prevent double processing
+                await prisma.scheduledMessage.update({
+                    where: { id: msg.id },
+                    data: { status: "SENDING" }
+                });
 
-                    await instance.socket.sendMessage(msg.jid, content);
-
-                    await prisma.scheduledMessage.update({
-                        where: { id: msg.id },
-                        data: { status: "SENT" }
-                    });
-                    logger.success("Scheduler", `Msg ${msg.id} sent to ${msg.jid}`);
-
-                } catch (err) {
-                    logger.error("Scheduler", `Failed to send scheduled msg ${msg.id}`, err);
-                    await prisma.scheduledMessage.update({
-                        where: { id: msg.id },
-                        data: { status: "FAILED" }
-                    });
+                let recipients: string[] = [];
+                if (msg.type === 'blast') {
+                    recipients = await getBlastRecipients(msg.sessionId, msg.jid);
+                    logger.info("Scheduler", `Blast ${msg.id} targeting ${recipients.length} contacts with tag "${msg.jid}"`);
+                } else {
+                    recipients = [msg.jid];
                 }
-            } else {
-                logger.warn("Scheduler", `Session ${msg.sessionId} not connected for scheduled msg ${msg.id}`);
-                // Optionally mark as failed or leave pending
+
+                if (recipients.length === 0) {
+                    throw new Error("No recipients found for this message.");
+                }
+
+                // Prepare Content
+                let content: any = {};
+                if (msg.mediaUrl) {
+                    const url = msg.mediaUrl;
+                    const type = msg.mediaType || 'image';
+                    if (type === 'video') content = { video: { url }, caption: msg.content };
+                    else if (type === 'document') content = { document: { url }, caption: msg.content, fileName: 'file', mimetype: 'application/octet-stream' };
+                    else content = { image: { url }, caption: msg.content };
+                } else {
+                    content = { text: msg.content };
+                }
+
+                // Send to each recipient
+                for (const toJid of recipients) {
+                    try {
+                        await instance.socket.sendMessage(toJid, content);
+                        if (msg.type === 'blast') {
+                            await new Promise(r => setTimeout(r, 2000)); // Anti-spam delay for blasts
+                        }
+                    } catch (sendErr) {
+                        logger.error("Scheduler", `Failed to send to ${toJid}`, sendErr);
+                    }
+                }
+
+                // Handle Rescheduling or Completion
+                if (msg.scheduleType === 'once' || !msg.scheduleType) {
+                    await prisma.scheduledMessage.update({
+                        where: { id: msg.id },
+                        data: { status: "SENT", updatedAt: new Date() }
+                    });
+                    logger.success("Scheduler", `Msg ${msg.id} finished successfully.`);
+                } else {
+                    // Reschedule (Daily logic - add 24 hours)
+                    const nextSend = new Date(msg.sendAt.getTime() + 24 * 60 * 60 * 1000);
+                    
+                    // Simple logic for working_days / holidays can be added here
+                    // For now, we'll follow the reference app's pattern of moving daily
+                    // and skipping delivery inside the loop if the day doesn't match.
+                    
+                    await prisma.scheduledMessage.update({
+                        where: { id: msg.id },
+                        data: { 
+                            sendAt: nextSend, 
+                            status: "PENDING",
+                            updatedAt: new Date() 
+                        }
+                    });
+                    logger.info("Scheduler", `Msg ${msg.id} rescheduled to ${nextSend.toISOString()}`);
+                }
+
+            } catch (err: any) {
+                logger.error("Scheduler", `Failed msg ${msg.id}`, err);
+                await prisma.scheduledMessage.update({
+                    where: { id: msg.id },
+                    data: { 
+                        status: "FAILED", 
+                        errorMessage: err?.message || String(err),
+                        updatedAt: new Date()
+                    }
+                });
             }
         }
     } catch (e) {
-        logger.error("Scheduler", "Error executing scheduler loop:", e);
+        logger.error("Scheduler", "Scheduler loop error:", e);
     }
 };
 
 export function startScheduler() {
-    logger.info("Scheduler", "Starting Message Scheduler...");
-
-    // Run immediately on start
+    logger.info("Scheduler", "Message Scheduler Service Started.");
     checkScheduledMessages();
-
-    // Then run every 30 seconds
-    setInterval(checkScheduledMessages, 30 * 1000);
+    setInterval(checkScheduledMessages, 60 * 1000);
 }

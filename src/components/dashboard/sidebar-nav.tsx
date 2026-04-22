@@ -67,11 +67,12 @@ const navGroups: NavGroup[] = [
         ],
     },
     {
-        label: "Contacts",
+        label: "Contacts & Lists",
         items: [
-            { href: "/dashboard/contacts", label: "Contacts", icon: UserCheck },
-            { href: "/dashboard/groups", label: "Groups", icon: Users },
-            { href: "/dashboard/labels", label: "Labels", icon: Tag },
+            { href: "/dashboard/contacts", label: "Synced Contacts", icon: UserCheck },
+            { href: "/dashboard/phonebook", label: "Manual Phonebook", icon: Contact },
+            { href: "/dashboard/groups", label: "WA Groups", icon: Users },
+            { href: "/dashboard/labels", label: "WA Labels", icon: Tag },
         ],
     },
     {
@@ -80,7 +81,7 @@ const navGroups: NavGroup[] = [
             { href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot },
             { href: "/dashboard/autoreply", label: "Auto Reply", icon: MessageCircleReply },
             { href: "/dashboard/profile", label: "Bot Profile", icon: UserCircle },
-            { href: "/dashboard/scheduler", label: "Scheduler", icon: CalendarClock },
+            { href: "/dashboard/scheduler", label: "Message Scheduler", icon: CalendarClock },
             { href: "/dashboard/webhooks", label: "Webhooks & API", icon: Webhook },
         ],
     },

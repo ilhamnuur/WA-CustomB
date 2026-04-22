@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -98,9 +97,9 @@ export default function ContactListPage() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Contacts</h2>
+                    <h2 className="text-3xl font-bold tracking-tight">Synced Contacts</h2>
                     <p className="text-muted-foreground">
-                        Manage and view your saved contacts.
+                        Contacts automatically synchronized from your WhatsApp session.
                     </p>
                 </div>
             </div>
@@ -111,7 +110,7 @@ export default function ContactListPage() {
                         <div className="space-y-1">
                             <CardTitle>Contact List</CardTitle>
                             <CardDescription>
-                                Total: {meta.total} contacts found
+                                Total: {meta.total} contacts discovered from WhatsApp
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -164,7 +163,7 @@ export default function ContactListPage() {
                                 ) : contacts.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={4} className="h-24 text-center">
-                                            No contacts found.
+                                            No sync contacts found.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
