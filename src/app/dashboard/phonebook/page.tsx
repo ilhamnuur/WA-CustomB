@@ -150,12 +150,24 @@ export default function PhoneBookPage() {
         
         setIsSaving(true);
         try {
-            // Basic CSV parsing: Name, Number, Category, Tags
-            const lines = importData.split("\n").filter(l => l.trim());
-            const parsed = lines.map(line => {
+            const lines = importData.split("\n").map(l => l.trim()).filter(l => l);
+            
+            // Check for header and skip
+            let startIndex = 0;
+            if (lines[0].toLowerCase().includes("number") || lines[0].toLowerCase().includes("phone")) {
+                startIndex = 1;
+            }
+
+            const parsed = lines.slice(startIndex).map(line => {
                 const [name, number, category, tags] = line.split(",").map(s => s?.trim());
                 return { name, number, category, tags };
             }).filter(c => c.number);
+
+            if (parsed.length === 0) {
+                toast.error("No valid contacts found in file");
+                setIsSaving(false);
+                return;
+            }
 
             const res = await fetch(`/api/phonebook/${sessionId}`, {
                 method: "PUT",
@@ -178,6 +190,20 @@ export default function PhoneBookPage() {
         }
     };
 
+    const handleDownloadTemplate = () => {
+        const headers = "Name, Number, Category, Tags";
+        const example = "John Doe, 628123456789, Customers, VIP\nJane Smith, 628987654321, Vendors, URGENT";
+        const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "phonebook_template.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Template downloaded. Open with Excel or Notepad.");
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -187,7 +213,10 @@ export default function PhoneBookPage() {
                         Manage your private contact lists and custom groups for broadcasting.
                     </p>
                 </div>
-                <div className="flex gap-2 w-full md:w-auto">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    <Button variant="secondary" onClick={handleDownloadTemplate}>
+                        <HelpCircle className="mr-2 h-4 w-4" /> Download Template
+                    </Button>
                     <Button variant="outline" onClick={() => setIsImportOpen(true)} disabled={!sessionId}>
                         <Upload className="mr-2 h-4 w-4" /> Import CSV
                     </Button>
@@ -364,39 +393,65 @@ export default function PhoneBookPage() {
 
             {/* Import Dialog */}
             <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            Bulk Import Contacts
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Format: Name, Number, Category, Tags</p>
-                                        <p>Example: John, 62812, VIP, TAG1</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                        <DialogTitle className="flex items-center gap-2 text-xl">
+                            <Upload className="h-5 w-5 text-primary" /> Bulk Import Contacts
                         </DialogTitle>
                         <DialogDescription>
-                            Paste your data in a CSV format (Name, Number, Category, Tags). One entry per line.
+                            Upload a <strong>.csv</strong> file containing your contacts. 
+                            <br />Make sure to use the template for the best results.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4">
-                        <Textarea 
-                            placeholder="John Doe, 628123456789, Customer, VIP&#10;Jane Smith, 628987654321, Vendor, URGENT" 
-                            className="min-h-[300px] font-mono text-sm"
-                            value={importData}
-                            onChange={e => setImportData(e.target.value)}
-                        />
+                    <div className="py-6 space-y-4">
+                        <div className="border-2 border-dashed border-muted-foreground/20 rounded-xl p-8 text-center hover:bg-muted/50 transition-colors relative cursor-pointer group">
+                            <input 
+                                type="file" 
+                                accept=".csv" 
+                                className="absolute inset-0 opacity-0 cursor-pointer" 
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                        setImportData(event.target?.result as string);
+                                        toast.info(`Selected: ${file.name}`);
+                                    };
+                                    reader.readAsText(file);
+                                }}
+                            />
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="p-3 bg-primary/10 rounded-full group-hover:scale-110 transition-transform">
+                                    <Upload className="h-6 w-6 text-primary" />
+                                </div>
+                                <div className="text-sm">
+                                    <span className="font-semibold text-primary">Click to upload</span> or drag and drop
+                                </div>
+                                <p className="text-xs text-muted-foreground">CSV (Excel Compatible) files only</p>
+                            </div>
+                        </div>
+
+                        {importData && (
+                            <div className="bg-muted p-3 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-bottom-2">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    <div className="h-8 w-8 bg-green-100 text-green-700 rounded flex items-center justify-center shrink-0">
+                                        <HelpCircle size={16} />
+                                    </div>
+                                    <div className="truncate">
+                                        <p className="text-xs font-semibold truncate">File Loaded</p>
+                                        <p className="text-[10px] text-muted-foreground">{importData.split('\n').length - 1} records detected</p>
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => setImportData("")} className="text-destructive">Remove</Button>
+                            </div>
+                        )}
                     </div>
-                    <DialogFooter>
-                        <Button variant="ghost" onClick={() => setIsImportOpen(false)}>Cancel</Button>
-                        <Button onClick={handleImport} disabled={isSaving || !importData}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Start Import
+                    <DialogFooter className="gap-2">
+                        <Button variant="ghost" onClick={() => { setIsImportOpen(false); setImportData(""); }}>Cancel</Button>
+                        <Button onClick={handleImport} disabled={isSaving || !importData} className="px-8 shadow-md">
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                            Process Import
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -19,24 +19,27 @@ async function getBlastRecipients(sessionId: string, tagName: string) {
 const checkScheduledMessages = async () => {
     try {
         const now = new Date();
-        //logger.debug("Scheduler", `Checking due messages...`);
+        // logger.debug("Scheduler", `Checking messages at ${now.toISOString()}`);
 
         const pendingMessages = await prisma.scheduledMessage.findMany({
             where: {
                 status: { in: ["PENDING", "SENDING"] },
                 sendAt: { lte: now }
+            },
+            include: {
+                session: true
             }
         });
 
         if (pendingMessages.length === 0) return;
 
-        logger.info("Scheduler", `Processing ${pendingMessages.length} messages.`);
+        logger.info("Scheduler", `Found ${pendingMessages.length} messages due for processing.`);
 
         for (const msg of pendingMessages) {
-            const instance = waManager.getInstance(msg.sessionId);
+            const instance = waManager.getInstance(msg.session.sessionId);
 
             if (!instance?.socket) {
-                logger.warn("Scheduler", `Session ${msg.sessionId} not active for msg ${msg.id}`);
+                logger.warn("Scheduler", `⚠️ Skipping msg ${msg.id}: Session ${msg.session.sessionId} is not connected.`);
                 continue;
             }
 
@@ -74,7 +77,13 @@ const checkScheduledMessages = async () => {
                 // Send to each recipient
                 for (const toJid of recipients) {
                     try {
+                        if (!toJid || !toJid.includes("@")) {
+                            logger.warn("Scheduler", `Skipping invalid JID for msg ${msg.id}: ${toJid}`);
+                            continue;
+                        }
+                        
                         await instance.socket.sendMessage(toJid, content);
+                        
                         if (msg.type === 'blast') {
                             await new Promise(r => setTimeout(r, 2000)); // Anti-spam delay for blasts
                         }

@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { WhatsAppInstance } from "./instance";
 import { Server } from "socket.io";
-import { initScheduler } from "@/lib/cron";
 import { logger } from "@/lib/logger";
 
 export class WhatsAppManager {
@@ -10,7 +9,6 @@ export class WhatsAppManager {
     public io: Server | null = null;
 
     private constructor() {
-        initScheduler();
     }
 
     public static getInstance(): WhatsAppManager {

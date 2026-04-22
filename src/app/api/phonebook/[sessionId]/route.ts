@@ -50,6 +50,20 @@ export const GET = auth(async (req, { params }) => {
             where.tags = { contains: tag, mode: 'insensitive' };
         }
 
+        if (searchParams.get("type") === "tags") {
+            const results = await prisma.phoneBook.findMany({
+                where: { sessionId: sessionData.id },
+                select: { tags: true }
+            });
+            const allTags = new Set<string>();
+            results.forEach(r => {
+                if (r.tags) {
+                    r.tags.split(',').forEach(t => allTags.add(t.trim()));
+                }
+            });
+            return NextResponse.json({ status: true, data: Array.from(allTags) });
+        }
+
         const [contacts, total] = await Promise.all([
             prisma.phoneBook.findMany({
                 where,

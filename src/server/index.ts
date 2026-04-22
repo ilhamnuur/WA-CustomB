@@ -4,6 +4,7 @@ import next from "next";
 import { Server } from "socket.io";
 import { setupSocket } from "./socket";
 import { waManager } from "../modules/whatsapp/manager";
+import { startScheduler } from "../modules/whatsapp/scheduler";
 import { logger } from "../lib/logger";
 import pkg from "../../package.json";
 
@@ -14,7 +15,7 @@ const port = parseInt(process.env.PORT || "3030", 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
   const server = createServer(async (req, res) => {
     try {
       if (!req.url) return;
@@ -42,10 +43,10 @@ app.prepare().then(() => {
 
   // Initialize WhatsApp Manager
   waManager.setup(io);
-  waManager.loadSessions();
+  await waManager.loadSessions();
 
   // Start Scheduler
-  import("../modules/whatsapp/scheduler").then(m => m.startScheduler());
+  startScheduler();
 
   // Cloudflare 520 Fix: increase keep-alive timeout so Node doesn't kill idle connections that Cloudflare expects to reuse
   // See: https://github.com/vercel/next.js/issues/48962

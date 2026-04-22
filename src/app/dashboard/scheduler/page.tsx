@@ -47,6 +47,8 @@ export default function SchedulerPage() {
 
     // Form state
     const [showForm, setShowForm] = useState(false);
+    const [availableTags, setAvailableTags] = useState<string[]>([]);
+    const [availableContacts, setAvailableContacts] = useState<any[]>([]);
     const [newJid, setNewJid] = useState("");
     const [newContent, setNewContent] = useState("");
     const [newSendAt, setNewSendAt] = useState("");
@@ -73,10 +75,25 @@ export default function SchedulerPage() {
 
         if (selectedSessionId) {
             fetchMessages(selectedSessionId);
+            fetchPhonebookData(selectedSessionId);
         } else {
             setMessages([]);
         }
     }, [selectedSessionId]);
+
+    const fetchPhonebookData = async (sessionId: string) => {
+        // Fetch Tags
+        fetch(`/api/phonebook/${sessionId}?type=tags`)
+            .then(res => res.json())
+            .then(d => setAvailableTags(d.data || []))
+            .catch(() => {});
+        
+        // Fetch All manual contacts for selection
+        fetch(`/api/phonebook/${sessionId}?limit=all`)
+            .then(res => res.json())
+            .then(d => setAvailableContacts(d.data || []))
+            .catch(() => {});
+    };
 
     const fetchMessages = async (sessionId: string) => {
         setLoading(true);
@@ -223,22 +240,48 @@ export default function SchedulerPage() {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="individual">Individual / Group JID</SelectItem>
+                                            <SelectItem value="individual">Individual / Manual Entry</SelectItem>
                                             <SelectItem value="blast">Broadcast to Contact Tag</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-2 col-span-1 md:col-span-2">
-                                    <Label>{newType === 'blast' ? 'Target Tag' : 'Recipient JID / Phone'}</Label>
-                                    <Input
-                                        value={newJid}
-                                        onChange={e => setNewJid(e.target.value)}
-                                        placeholder={newType === 'blast' ? "e.g. CUSTOMER_VIP" : "e.g. 628123456789 or group-id"}
-                                    />
-                                    <p className="text-[10px] text-muted-foreground">
+                                    <Label>{newType === 'blast' ? 'Target Tag Group' : 'Recipient Selection'}</Label>
+                                    <div className="flex gap-2">
+                                        <Select value={newJid} onValueChange={setNewJid}>
+                                            <SelectTrigger className="flex-1">
+                                                <SelectValue placeholder={newType === 'blast' ? "Pick a tag group..." : "Pick a contact..."} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {newType === 'blast' ? (
+                                                    availableTags.map(tag => (
+                                                        <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                                                    ))
+                                                ) : (
+                                                    availableContacts.map(c => (
+                                                        <SelectItem key={c.id} value={c.number}>{c.name || c.number} ({c.number})</SelectItem>
+                                                    ))
+                                                )}
+                                                {newType === 'individual' && (
+                                                    <SelectItem value="__MANUAL__">--- Type Manually ---</SelectItem>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        
+                                        {((newType === 'individual' && newJid === '__MANUAL__') || (availableTags.length === 0 && newType === 'blast')) && (
+                                            <Input
+                                                className="flex-1"
+                                                value={newJid === '__MANUAL__' ? "" : newJid}
+                                                onChange={e => setNewJid(e.target.value)}
+                                                placeholder={newType === 'blast' ? "Enter Tag Name" : "Enter Phone/ID"}
+                                                onBlur={(e) => { if (!e.target.value) setNewJid("") }}
+                                            />
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground italic">
                                         {newType === 'blast' 
-                                            ? "Messages will be sent to all contacts with this tag." 
-                                            : "Enter full phone number or WhatsApp group ID."}
+                                            ? "Messages will be sent to all contacts in the Manual Phonebook matching this tag." 
+                                            : "Choose a contact from Phonebook or enter a new number."}
                                     </p>
                                 </div>
                             </div>
