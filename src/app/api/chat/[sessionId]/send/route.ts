@@ -1,7 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
-import { waManager } from "@/modules/whatsapp/manager";
 import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
-import Sticker from "wa-sticker-formatter";
+import { ChatService } from "@/modules/whatsapp/chat.service";
 
 export async function POST(
     request: NextRequest,
