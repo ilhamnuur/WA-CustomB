@@ -24,7 +24,8 @@ import {
     PaginationPrevious
 } from "@/components/ui/pagination";
 
-import { Search, Loader2, UserPlus, Tag, Folder, Phone, Edit, Trash2, Upload, HelpCircle } from "lucide-react";
+import { Search, Loader2, UserPlus, Tag, Folder, Phone, Edit, Trash2, Upload, HelpCircle, FileSpreadsheet, CheckCircle2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import {
     Select,
     SelectContent,
@@ -74,7 +75,8 @@ export default function PhoneBookPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [importData, setImportData] = useState("");
+    const [importData, setImportData] = useState<any[]>([]);
+    const [importFileName, setImportFileName] = useState("");
     const [formData, setFormData] = useState({
         name: "",
         number: "",
@@ -146,25 +148,38 @@ export default function PhoneBookPage() {
     };
 
     const handleImport = async () => {
-        if (!sessionId || !importData) return;
+        if (!sessionId || importData.length === 0) return;
         
         setIsSaving(true);
         try {
-            const lines = importData.split("\n").map(l => l.trim()).filter(l => l);
-            
-            // Check for header and skip
-            let startIndex = 0;
-            if (lines[0].toLowerCase().includes("number") || lines[0].toLowerCase().includes("phone")) {
-                startIndex = 1;
-            }
+            const parsed = importData.map(row => {
+                // Try to find columns regardless of case
+                const numberKey = Object.keys(row).find(k => 
+                    ["number", "nomor", "phone", "telepon", "wa", "whatsapp"].includes(k.toLowerCase())
+                ) || "Number";
+                
+                const nameKey = Object.keys(row).find(k => 
+                    ["name", "nama", "fullname"].includes(k.toLowerCase())
+                ) || "Name";
 
-            const parsed = lines.slice(startIndex).map(line => {
-                const [name, number, category, tags] = line.split(",").map(s => s?.trim());
-                return { name, number, category, tags };
+                const categoryKey = Object.keys(row).find(k => 
+                    ["category", "kategori"].includes(k.toLowerCase())
+                ) || "Category";
+
+                const tagsKey = Object.keys(row).find(k => 
+                    ["tags", "tag", "label", "group"].includes(k.toLowerCase())
+                ) || "Tags";
+
+                return {
+                    name: String(row[nameKey] || ""),
+                    number: String(row[numberKey] || ""),
+                    category: String(row[categoryKey] || ""),
+                    tags: String(row[tagsKey] || "")
+                };
             }).filter(c => c.number);
 
             if (parsed.length === 0) {
-                toast.error("No valid contacts found in file");
+                toast.error("No valid contacts with phone numbers found");
                 setIsSaving(false);
                 return;
             }
@@ -178,30 +193,31 @@ export default function PhoneBookPage() {
             if (res.ok) {
                 toast.success(`Imported ${parsed.length} contacts`);
                 setIsImportOpen(false);
-                setImportData("");
+                setImportData([]);
+                setImportFileName("");
                 fetchContacts();
             } else {
-                toast.error("Import failed");
+                const err = await res.json();
+                toast.error(err.message || "Import failed");
             }
         } catch (error) {
-            toast.error("Format error in CSV data");
+            console.error("Import error:", error);
+            toast.error("Format error in Excel data");
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleDownloadTemplate = () => {
-        const headers = "Name, Number, Category, Tags";
-        const example = "John Doe, 628123456789, Customers, VIP\nJane Smith, 628987654321, Vendors, URGENT";
-        const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "phonebook_template.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success("Template downloaded. Open with Excel or Notepad.");
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet([
+            ["Name", "Number", "Category", "Tags"],
+            ["John Doe", "628123456789", "Customers", "VIP, Jakarta"],
+            ["Jane Smith", "628987654321", "Vendors", "URGENT"]
+        ]);
+        XLSX.utils.book_append_sheet(wb, ws, "Phonebook Template");
+        XLSX.writeFile(wb, "phonebook_template.xlsx");
+        toast.success("Excel template downloaded.");
     };
 
     return (
@@ -218,7 +234,7 @@ export default function PhoneBookPage() {
                         <HelpCircle className="mr-2 h-4 w-4" /> Download Template
                     </Button>
                     <Button variant="outline" onClick={() => setIsImportOpen(true)} disabled={!sessionId}>
-                        <Upload className="mr-2 h-4 w-4" /> Import CSV
+                        <Upload className="mr-2 h-4 w-4" /> Import Excel
                     </Button>
                     <Button onClick={() => setIsDialogOpen(true)} disabled={!sessionId}>
                         <UserPlus className="mr-2 h-4 w-4" /> Add Contact
@@ -399,7 +415,7 @@ export default function PhoneBookPage() {
                             <Upload className="h-5 w-5 text-primary" /> Bulk Import Contacts
                         </DialogTitle>
                         <DialogDescription>
-                            Upload a <strong>.csv</strong> file containing your contacts. 
+                            Upload an <strong>Excel (.xlsx, .xls)</strong> file containing your contacts. 
                             <br />Make sure to use the template for the best results.
                         </DialogDescription>
                     </DialogHeader>
@@ -407,7 +423,7 @@ export default function PhoneBookPage() {
                         <div className="border-2 border-dashed border-muted-foreground/20 rounded-xl p-8 text-center hover:bg-muted/50 transition-colors relative cursor-pointer group">
                             <input 
                                 type="file" 
-                                accept=".csv" 
+                                accept=".xlsx, .xls" 
                                 className="absolute inset-0 opacity-0 cursor-pointer" 
                                 onChange={async (e) => {
                                     const file = e.target.files?.[0];
@@ -415,35 +431,51 @@ export default function PhoneBookPage() {
                                     
                                     const reader = new FileReader();
                                     reader.onload = (event) => {
-                                        setImportData(event.target?.result as string);
-                                        toast.info(`Selected: ${file.name}`);
+                                        try {
+                                            const data = new Uint8Array(event.target?.result as ArrayBuffer);
+                                            const workbook = XLSX.read(data, { type: "array" });
+                                            const firstSheetName = workbook.SheetNames[0];
+                                            const worksheet = workbook.Sheets[firstSheetName];
+                                            const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                                            
+                                            if (jsonData.length === 0) {
+                                                toast.error("Excel file is empty");
+                                                return;
+                                            }
+                                            
+                                            setImportData(jsonData);
+                                            setImportFileName(file.name);
+                                            toast.info(`Selected: ${file.name}`);
+                                        } catch (error) {
+                                            toast.error("Failed to parse Excel file");
+                                        }
                                     };
-                                    reader.readAsText(file);
+                                    reader.readAsArrayBuffer(file);
                                 }}
                             />
                             <div className="flex flex-col items-center gap-2">
                                 <div className="p-3 bg-primary/10 rounded-full group-hover:scale-110 transition-transform">
-                                    <Upload className="h-6 w-6 text-primary" />
+                                    <FileSpreadsheet className="h-6 w-6 text-primary" />
                                 </div>
                                 <div className="text-sm">
-                                    <span className="font-semibold text-primary">Click to upload</span> or drag and drop
+                                    <span className="font-semibold text-primary">Click to upload Excel</span> or drag and drop
                                 </div>
-                                <p className="text-xs text-muted-foreground">CSV (Excel Compatible) files only</p>
+                                <p className="text-xs text-muted-foreground">.xlsx or .xls files only</p>
                             </div>
                         </div>
 
-                        {importData && (
+                        {importData.length > 0 && (
                             <div className="bg-muted p-3 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-bottom-2">
                                 <div className="flex items-center gap-2 overflow-hidden">
                                     <div className="h-8 w-8 bg-green-100 text-green-700 rounded flex items-center justify-center shrink-0">
-                                        <HelpCircle size={16} />
+                                        <CheckCircle2 size={16} />
                                     </div>
                                     <div className="truncate">
-                                        <p className="text-xs font-semibold truncate">File Loaded</p>
-                                        <p className="text-[10px] text-muted-foreground">{importData.split('\n').length - 1} records detected</p>
+                                        <p className="text-xs font-semibold truncate">{importFileName}</p>
+                                        <p className="text-[10px] text-muted-foreground">{importData.length} records detected</p>
                                     </div>
                                 </div>
-                                <Button variant="ghost" size="sm" onClick={() => setImportData("")} className="text-destructive">Remove</Button>
+                                <Button variant="ghost" size="sm" onClick={() => { setImportData([]); setImportFileName(""); }} className="text-destructive">Remove</Button>
                             </div>
                         )}
                     </div>
