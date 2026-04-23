@@ -252,16 +252,14 @@ export default function CustomBlastPage() {
             <div className="space-y-6 max-w-7xl mx-auto pb-20">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent italic">
-                            CUSTOM BLAST CAMPAIGN
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Send personalized messages with custom variables from Excel or Phonebook.
+                        <h2 className="text-xl sm:text-3xl font-bold tracking-tight">Custom Blast</h2>
+                        <p className="text-muted-foreground text-sm mt-1">
+                            Kirim pesan personalisasi menggunakan variabel dari Excel atau Phonebook.
                         </p>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={downloadTemplate}>
-                            <Download className="h-4 w-4 mr-2" /> Template Excel
+                            <Download className="h-4 w-4 mr-2" /> Download Template
                         </Button>
                     </div>
                 </div>
