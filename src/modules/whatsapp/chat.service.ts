@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { batchResolveToPhoneJid, normalizeJid } from "@/lib/jid-utils";
 import { waManager } from "@/modules/whatsapp/manager";
-import Sticker from "wa-sticker-formatter";
+import { Sticker } from "wa-sticker-formatter";
 
 export class ChatService {
     /**

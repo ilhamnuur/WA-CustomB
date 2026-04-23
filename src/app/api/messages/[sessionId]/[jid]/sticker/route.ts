@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { waManager } from "@/modules/whatsapp/manager";
 import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
-import Sticker from "wa-sticker-formatter";
+import { Sticker } from "wa-sticker-formatter";
 
 // POST: Send sticker from image
 export async function POST(

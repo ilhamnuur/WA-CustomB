@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { WASocket, WAMessage } from "@whiskeysockets/baileys";
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
-import Sticker from "wa-sticker-formatter";
+import { Sticker } from "wa-sticker-formatter";
 import sharp from "sharp";
 import fs from "fs/promises";
 import path from "path";

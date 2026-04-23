@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { waManager } from "@/modules/whatsapp/manager";
 import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
-import Sticker from "wa-sticker-formatter";
+import { Sticker } from "wa-sticker-formatter";
 
 /**
  * @deprecated This endpoint is deprecated. Use POST /api/messages/{sessionId}/{jid}/sticker instead.
