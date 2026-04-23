@@ -10,7 +10,7 @@ import pkg from "../../package.json";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "localhost";
-const port = parseInt(process.env.PORT || "3030", 10);
+const port = parseInt(process.env.PORT || "3080", 10);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();

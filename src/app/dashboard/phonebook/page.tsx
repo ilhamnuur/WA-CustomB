@@ -13,8 +13,10 @@ import {
     TableCell,
     TableHead,
     TableHeader,
-    TableRow
+    TableRow,
+    TableFooter
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Pagination,
     PaginationContent,
@@ -50,6 +52,16 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PhoneContact {
     id: string;
@@ -83,6 +95,16 @@ export default function PhoneBookPage() {
         category: "",
         tags: ""
     });
+
+    // Selection & Bulk
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [editingContact, setEditingContact] = useState<PhoneContact | null>(null);
+
+    // Confirmation
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [idsToDelete, setIdsToDelete] = useState<string[]>([]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -125,16 +147,26 @@ export default function PhoneBookPage() {
         
         setIsSaving(true);
         try {
-            const res = await fetch(`/api/phonebook/${sessionId}`, {
-                method: "POST",
+            const url = editingContact 
+                ? `/api/phonebook/${sessionId}` 
+                : `/api/phonebook/${sessionId}`;
+            const method = editingContact ? "PATCH" : "POST";
+            const body = editingContact 
+                ? { ...formData, id: editingContact.id }
+                : formData;
+
+            const res = await fetch(url, {
+                method: method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(body)
             });
 
             if (res.ok) {
-                toast.success("Contact added to phonebook");
+                toast.success(editingContact ? "Contact updated" : "Contact added");
                 setIsDialogOpen(false);
+                setIsEditDialogOpen(false);
                 setFormData({ name: "", number: "", category: "", tags: "" });
+                setEditingContact(null);
                 fetchContacts();
             } else {
                 const err = await res.json();
@@ -145,6 +177,69 @@ export default function PhoneBookPage() {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleDelete = async (ids: string[]) => {
+        if (!sessionId || !ids || ids.length === 0) return;
+        
+        setIdsToDelete(ids);
+        setIsConfirmOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!sessionId || idsToDelete.length === 0) return;
+
+        setIsDeleting(true);
+        try {
+            const res = await fetch(`/api/phonebook/${sessionId}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: idsToDelete })
+            });
+
+            if (res.ok) {
+                toast.success("Deleted successfully");
+                setSelectedIds(new Set());
+                fetchContacts();
+            } else {
+                toast.error("Failed to delete");
+            }
+        } catch (error) {
+            toast.error("An error occurred");
+        } finally {
+            setIsDeleting(false);
+            setIsConfirmOpen(false);
+            setIdsToDelete([]);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === contacts.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(contacts.map(c => c.id)));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) {
+            next.delete(id);
+        } else {
+            next.add(id);
+        }
+        setSelectedIds(next);
+    };
+
+    const openEditDialog = (contact: PhoneContact) => {
+        setEditingContact(contact);
+        setFormData({
+            name: contact.name || "",
+            number: contact.number,
+            category: contact.category || "",
+            tags: contact.tags || ""
+        });
+        setIsEditDialogOpen(true);
     };
 
     const handleImport = async () => {
@@ -281,11 +376,17 @@ export default function PhoneBookPage() {
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
+                                    <TableHead className="w-[40px]">
+                                        <Checkbox 
+                                            checked={contacts.length > 0 && selectedIds.size === contacts.length}
+                                            onCheckedChange={toggleSelectAll}
+                                        />
+                                    </TableHead>
                                     <TableHead>Contact Name</TableHead>
                                     <TableHead>Phone Number</TableHead>
                                     <TableHead className="hidden lg:table-cell">Category</TableHead>
                                     <TableHead className="hidden md:table-cell">Groups / Tags</TableHead>
-                                    <TableHead className="text-right">Added</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -303,7 +404,13 @@ export default function PhoneBookPage() {
                                     </TableRow>
                                 ) : (
                                     contacts.map((contact) => (
-                                        <TableRow key={contact.id}>
+                                        <TableRow key={contact.id} className={selectedIds.has(contact.id) ? "bg-muted/30" : ""}>
+                                            <TableCell>
+                                                <Checkbox 
+                                                    checked={selectedIds.has(contact.id)}
+                                                    onCheckedChange={() => toggleSelect(contact.id)}
+                                                />
+                                            </TableCell>
                                             <TableCell className="font-medium">
                                                 {contact.name || "Unnamed"}
                                             </TableCell>
@@ -329,8 +436,15 @@ export default function PhoneBookPage() {
                                                     ))}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-right text-xs text-muted-foreground">
-                                                {new Date(contact.createdAt).toLocaleDateString()}
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(contact)}>
+                                                        <Edit className="h-4 w-4 text-blue-600" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete([contact.id])}>
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -338,6 +452,31 @@ export default function PhoneBookPage() {
                             </TableBody>
                         </Table>
                     </div>
+
+                    {selectedIds.size > 0 && (
+                        <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-bottom-2">
+                            <div className="flex items-center gap-3">
+                                <Badge variant="secondary" className="px-2 py-1">
+                                    {selectedIds.size} Selected
+                                </Badge>
+                                <p className="text-sm text-muted-foreground">Perform actions on selected contacts.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button 
+                                    variant="destructive" 
+                                    size="sm" 
+                                    onClick={() => handleDelete(Array.from(selectedIds))}
+                                    disabled={isDeleting}
+                                >
+                                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                                    Delete Selected
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                                    Cancel
+                                </Button>
+                            </div>
+                        </div>
+                    )}
 
                     {meta.totalPages > 1 && (
                         <div className="mt-4 flex justify-center">
@@ -373,12 +512,21 @@ export default function PhoneBookPage() {
                 </CardContent>
             </Card>
 
-            {/* Add Dialog */}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            {/* Add/Edit Dialog */}
+            <Dialog open={isDialogOpen || isEditDialogOpen} onOpenChange={(open) => {
+                if (!open) {
+                    setIsDialogOpen(false);
+                    setIsEditDialogOpen(false);
+                    setEditingContact(null);
+                    setFormData({ name: "", number: "", category: "", tags: "" });
+                }
+            }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Add Manual Contact</DialogTitle>
-                        <DialogDescription>Enter a phone number to add it to your broadcast list.</DialogDescription>
+                        <DialogTitle>{editingContact ? "Edit Contact" : "Add Manual Contact"}</DialogTitle>
+                        <DialogDescription>
+                            {editingContact ? "Update contact information." : "Enter a phone number to add it to your broadcast list."}
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
@@ -401,7 +549,7 @@ export default function PhoneBookPage() {
                     <DialogFooter>
                         <Button onClick={handleSaveContact} disabled={isSaving}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save Contact
+                            {editingContact ? "Update Contact" : "Save Contact"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -488,6 +636,33 @@ export default function PhoneBookPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Confirmation Dialog */}
+            <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete {idsToDelete.length} contact(s) 
+                            from your manual phonebook.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => { setIsConfirmOpen(false); setIdsToDelete([]); }}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={(e) => {
+                                e.preventDefault();
+                                confirmDelete();
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

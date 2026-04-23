@@ -196,3 +196,94 @@ export const PUT = auth(async (req, { params }) => {
         return NextResponse.json({ status: false, message: "Import failed" }, { status: 500 });
     }
 }) as any;
+
+export const PATCH = auth(async (req, { params }) => {
+    try {
+        const user = await getAuthenticatedUser(req as any);
+        if (!user) return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
+
+        const { sessionId } = await (params as any);
+        const body = await req.json();
+        const { id, name, number, category, tags } = body;
+
+        if (!id) return NextResponse.json({ status: false, message: "ID is required" }, { status: 400 });
+
+        const canAccess = await canAccessSession(user.id, user.role, sessionId);
+        if (!canAccess) return NextResponse.json({ status: false, message: "Forbidden" }, { status: 403 });
+
+        const cleanNumber = number ? number.replace(/\D/g, '') : undefined;
+        const jid = cleanNumber ? `${cleanNumber}@s.whatsapp.net` : undefined;
+
+        const updated = await prisma.phoneBook.update({
+            where: { id },
+            data: {
+                name,
+                number: cleanNumber,
+                jid,
+                category,
+                tags
+            }
+        });
+
+        return NextResponse.json({
+            status: true,
+            message: "Contact updated successfully",
+            data: updated
+        });
+    } catch (error) {
+        console.error("Update contact error:", error);
+        return NextResponse.json({ status: false, message: "Update failed" }, { status: 500 });
+    }
+}) as any;
+
+export const DELETE = auth(async (req, { params }) => {
+    try {
+        const user = await getAuthenticatedUser(req as any);
+        if (!user) return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
+
+        const { sessionId } = await (params as any);
+        const canAccess = await canAccessSession(user.id, user.role, sessionId);
+        if (!canAccess) return NextResponse.json({ status: false, message: "Forbidden" }, { status: 403 });
+
+        const sessionData = await prisma.session.findUnique({
+            where: { sessionId: sessionId },
+            select: { id: true }
+        });
+        if (!sessionData) return NextResponse.json({ status: false, message: "Session not found" }, { status: 404 });
+
+        // Get IDs from body or query
+        const { searchParams } = new URL(req.url);
+        const queryId = searchParams.get("id");
+        
+        let ids: string[] = [];
+        try {
+            const body = await req.json();
+            ids = body.ids || [];
+        } catch (e) {
+            // Body might be empty
+        }
+
+        if (queryId && !ids.includes(queryId)) {
+            ids.push(queryId);
+        }
+
+        if (ids.length === 0) {
+            return NextResponse.json({ status: false, message: "No IDs provided" }, { status: 400 });
+        }
+
+        const deleteResult = await prisma.phoneBook.deleteMany({
+            where: {
+                id: { in: ids },
+                sessionId: sessionData.id // Safe check
+            }
+        });
+
+        return NextResponse.json({
+            status: true,
+            message: `Successfully deleted ${deleteResult.count} contacts`
+        });
+    } catch (error) {
+        console.error("Delete contact error:", error);
+        return NextResponse.json({ status: false, message: "Delete failed" }, { status: 500 });
+    }
+}) as any;
