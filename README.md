@@ -178,6 +178,48 @@ curl -X POST http://localhost:3000/api/messages/session_01/62812345678@s.whatsap
 
 ---
 
+---
+
+## 🌍 Deployment & Online Access
+
+### 1. Ubuntu Server Setup (Local/Cloud)
+To run WA-AKG on a permanent Ubuntu server:
+
+```bash
+# 1. Install Node.js 20 & PM2
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+sudo npm install pm2 -g
+
+# 2. Database (Example: PostgreSQL)
+sudo apt install postgresql -y
+# Create database and user according to your .env configuration
+
+# 3. Application Setup
+cd /path/to/WA-AKG
+npm install
+npm run build
+
+# 4. Run with PM2
+pm2 start ecosystem.config.js
+pm2 save
+```
+
+### 2. Online via Cloudflare Zero Trust (Tunnel)
+If you are running on a local server and want to make it accessible online securely without port forwarding:
+
+1.  **Install Cloudflared**: Download and install the `cloudflared` package on your Ubuntu server.
+2.  **Create Tunnel**: Go to [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/) -> Networks -> Tunnels.
+3.  **Configure Public Hostname**:
+    *   **Service**: `HTTP://localhost:3080`
+    *   **Domain**: Your chosen domain (e.g., `wa.yourdomain.com`).
+4.  **Update Environment**:
+    *   Edit `.env` and update `BASE_URL` to your new public domain:  
+        `BASE_URL="https://wa.yourdomain.com"`
+    *   Restart app: `pm2 restart wa-akg`
+
+---
+
 ## 🛡️ Security
 - **API Key Auth**: Secured endpoints using `X-API-Key`.
 - **RBAC**: Multi-role support (`SUPERADMIN`, `OWNER`, `STAFF`).
