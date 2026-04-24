@@ -508,7 +508,7 @@ export default function CustomBlastPage() {
                                     <CardTitle className="text-sm font-bold flex items-center gap-2">
                                         <History className="h-4 w-4" /> Live Campaign Logs
                                     </CardTitle>
-                                    <Button variant="ghost" size="xs" onClick={() => setLogs([])}>Clear</Button>
+                                    <Button variant="ghost" size="sm" onClick={() => setLogs([])}>Clear</Button>
                                 </CardHeader>
                                 <CardContent className="p-0 max-h-60 overflow-y-auto">
                                     <table className="w-full text-xs text-left">

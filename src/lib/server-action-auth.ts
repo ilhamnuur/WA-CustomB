@@ -10,9 +10,10 @@ export async function getAuthenticatedUserForAction() {
     try {
         const session = await auth();
         
-        if (session?.user?.id || (session?.user as any)?.email) {
-            const userId = session.user.id;
-            const userEmail = (session.user as any).email;
+        if (!session?.user) return null;
+
+        const userId = session.user.id;
+        const userEmail = (session.user as any).email;
 
             // First try ID
             let user = userId ? await prisma.user.findUnique({
@@ -35,7 +36,6 @@ export async function getAuthenticatedUserForAction() {
             if (user) {
                 return user;
             }
-        }
         return null;
     } catch (error) {
         logger.error("Auth", "Error getting authenticated user for action:", error);

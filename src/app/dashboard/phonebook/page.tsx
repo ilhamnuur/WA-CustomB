@@ -628,8 +628,8 @@ export default function PhoneBookPage() {
                         )}
                     </div>
                     <DialogFooter className="gap-2">
-                        <Button variant="ghost" onClick={() => { setIsImportOpen(false); setImportData(""); }}>Cancel</Button>
-                        <Button onClick={handleImport} disabled={isSaving || !importData} className="px-8 shadow-md">
+                        <Button variant="ghost" onClick={() => { setIsImportOpen(false); setImportData([]); }}>Cancel</Button>
+                        <Button onClick={handleImport} disabled={isSaving || importData.length === 0} className="px-8 shadow-md">
                             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                             Process Import
                         </Button>
