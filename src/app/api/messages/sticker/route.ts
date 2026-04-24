@@ -41,11 +41,7 @@ export async function POST(request: NextRequest) {
         // Create Sticker
         const sticker = new Sticker(buffer, {
             pack: "WA-AKG",
-            author: user.name || "User",
-            type: "full",
-            categories: ["🤩", "🎉"] as any,
-            quality: 50,
-            background: "transparent"
+            author: user.name || "User"
         });
 
         const stickerBuffer = await sticker.toBuffer();

@@ -139,9 +139,7 @@ export class ChatService {
                 const buffer = await res.arrayBuffer();
                 const sticker = new Sticker(Buffer.from(buffer), {
                     pack: msgPayload.sticker.pack || "WA-AKG Bot",
-                    author: msgPayload.sticker.author || "WA-AKG",
-                    type: "full",
-                    quality: 50
+                    author: msgPayload.sticker.author || "WA-AKG"
                 });
                 msgPayload = { sticker: await sticker.toBuffer() };
             } catch (e: any) {
@@ -192,9 +190,7 @@ export class ChatService {
         } else if (type === 'sticker') {
             const sticker = new Sticker(buffer, {
                 pack: "WA-AKG Bot",
-                author: "WA-AKG",
-                type: "full",
-                quality: 50
+                author: "WA-AKG"
             });
             content = { sticker: await sticker.toBuffer() };
         } else {

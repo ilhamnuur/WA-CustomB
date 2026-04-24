@@ -4,7 +4,7 @@ import path from "path";
 const nextConfig: NextConfig = {
   serverExternalPackages: ["sharp", "bcryptjs"],
   turbopack: {
-    root: path.resolve(__dirname),
+    root: path.resolve(/* turbopackIgnore: true */ __dirname),
   },
 };
 

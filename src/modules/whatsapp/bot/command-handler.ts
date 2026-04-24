@@ -307,9 +307,7 @@ export async function handleBotCommand(
                     // Convert
                     const sticker = new Sticker(buffer as Buffer, {
                         pack: (config as any).botName || "WA-AKG Bot",
-                        author: "By " + ((config as any).botName || "WA-AKG Bot"),
-                        type: "full", // full, crop, circle
-                        quality: 15 // Extreme quality reduction for size
+                        author: "By " + ((config as any).botName || "WA-AKG Bot")
                     });
 
                     const stickerBuffer = await sticker.toBuffer();

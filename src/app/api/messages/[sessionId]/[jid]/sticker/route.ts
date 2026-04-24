@@ -46,11 +46,7 @@ export async function POST(
         // Create Sticker
         const sticker = new Sticker(buffer, {
             pack,
-            author,
-            type: type as any,
-            categories: ["🤩", "🎉"] as any,
-            quality,
-            background: "transparent"
+            author
         });
 
         const stickerBuffer = await sticker.toBuffer();
