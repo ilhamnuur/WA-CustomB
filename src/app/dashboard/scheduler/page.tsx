@@ -57,6 +57,7 @@ export default function SchedulerPage() {
     const [newType, setNewType] = useState("individual");
     const [newScheduleType, setNewScheduleType] = useState("once");
 
+    const [isManual, setIsManual] = useState(false);
     // Delete state
     const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -124,6 +125,10 @@ export default function SchedulerPage() {
         const localIso = moment.tz(msg.sendAt, systemTimezone).format('YYYY-MM-DDTHH:mm');
         setNewSendAt(localIso);
 
+        // Check if JID is manual (not in available contacts)
+        const isContact = availableContacts.some(c => c.number === msg.jid.split('@')[0]);
+        setIsManual(!isContact && msg.type === 'individual');
+
         setShowForm(true);
     };
 
@@ -178,6 +183,7 @@ export default function SchedulerPage() {
         setNewType("individual");
         setNewScheduleType("once");
         setEditingId(null);
+        setIsManual(false);
     };
 
     const confirmDelete = async () => {
@@ -248,7 +254,18 @@ export default function SchedulerPage() {
                                 <div className="space-y-2 col-span-1 md:col-span-2">
                                     <Label>{newType === 'blast' ? 'Target Tag Group' : 'Recipient Selection'}</Label>
                                     <div className="flex gap-2">
-                                        <Select value={newJid} onValueChange={setNewJid}>
+                                        <Select 
+                                            value={isManual ? "__MANUAL__" : newJid} 
+                                            onValueChange={(val) => {
+                                                if (val === "__MANUAL__") {
+                                                    setIsManual(true);
+                                                    setNewJid("");
+                                                } else {
+                                                    setIsManual(false);
+                                                    setNewJid(val);
+                                                }
+                                            }}
+                                        >
                                             <SelectTrigger className="flex-1">
                                                 <SelectValue placeholder={newType === 'blast' ? "Pick a tag group..." : "Pick a contact..."} />
                                             </SelectTrigger>
@@ -258,23 +275,23 @@ export default function SchedulerPage() {
                                                         <SelectItem key={tag} value={tag}>{tag}</SelectItem>
                                                     ))
                                                 ) : (
-                                                    availableContacts.map(c => (
-                                                        <SelectItem key={c.id} value={c.number}>{c.name || c.number} ({c.number})</SelectItem>
-                                                    ))
-                                                )}
-                                                {newType === 'individual' && (
-                                                    <SelectItem value="__MANUAL__">--- Type Manually ---</SelectItem>
+                                                    <>
+                                                        {availableContacts.map(c => (
+                                                            <SelectItem key={c.id} value={c.number}>{c.name || c.number} ({c.number})</SelectItem>
+                                                        ))}
+                                                        <SelectItem value="__MANUAL__">--- Type Manually ---</SelectItem>
+                                                    </>
                                                 )}
                                             </SelectContent>
                                         </Select>
                                         
-                                        {((newType === 'individual' && newJid === '__MANUAL__') || (availableTags.length === 0 && newType === 'blast')) && (
+                                        {(isManual || (availableTags.length === 0 && newType === 'blast')) && (
                                             <Input
                                                 className="flex-1"
-                                                value={newJid === '__MANUAL__' ? "" : newJid}
+                                                value={newJid}
                                                 onChange={e => setNewJid(e.target.value)}
                                                 placeholder={newType === 'blast' ? "Enter Tag Name" : "Enter Phone/ID"}
-                                                onBlur={(e) => { if (!e.target.value) setNewJid("") }}
+                                                autoFocus
                                             />
                                         )}
                                     </div>
