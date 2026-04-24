@@ -141,7 +141,7 @@ export class ChatService {
                     pack: msgPayload.sticker.pack || "WA-AKG Bot",
                     author: msgPayload.sticker.author || "WA-AKG"
                 });
-                msgPayload = { sticker: await sticker.toBuffer() };
+                msgPayload = { sticker: await sticker.get() };
             } catch (e: any) {
                 throw new Error(`Failed to generate sticker from URL: ${e.message}`);
             }
@@ -192,7 +192,7 @@ export class ChatService {
                 pack: "WA-AKG Bot",
                 author: "WA-AKG"
             });
-            content = { sticker: await sticker.toBuffer() };
+            content = { sticker: await sticker.get() };
         } else {
              content = { document: buffer, mimetype, fileName, ...messageOptions };
         }

@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
             author: user.name || "User"
         });
 
-        const stickerBuffer = await sticker.toBuffer();
+        const stickerBuffer = await sticker.get();
 
         await instance.socket.sendMessage(jid, { sticker: stickerBuffer });
 

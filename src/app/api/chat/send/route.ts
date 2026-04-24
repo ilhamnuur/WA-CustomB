@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
                     author: msgPayload.sticker.author || "WA-AKG"
                 });
 
-                const stickerBuffer = await sticker.toBuffer();
+                const stickerBuffer = await sticker.get();
                 msgPayload = { sticker: stickerBuffer };
 
             } catch (e) {

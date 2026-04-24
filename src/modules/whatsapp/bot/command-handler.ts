@@ -310,7 +310,7 @@ export async function handleBotCommand(
                         author: "By " + ((config as any).botName || "WA-AKG Bot")
                     });
 
-                    const stickerBuffer = await sticker.toBuffer();
+                    const stickerBuffer = await sticker.get();
 
                     // Send
                     await sock.sendMessage(remoteJid, { sticker: stickerBuffer }, { quoted: msg });

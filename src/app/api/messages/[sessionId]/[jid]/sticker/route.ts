@@ -49,7 +49,7 @@ export async function POST(
             author
         });
 
-        const stickerBuffer = await sticker.toBuffer();
+        const stickerBuffer = await sticker.get();
 
         await instance.socket.sendMessage(decodedJid, { sticker: stickerBuffer });
 
