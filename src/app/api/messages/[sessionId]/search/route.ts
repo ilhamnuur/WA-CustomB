@@ -91,7 +91,7 @@ export async function GET(
                     status: true,
                     timestamp: true,
                     quoteId: true,
-                    contract: {
+                    contact: {
                         select: {
                             name: true,
                             notify: true,
