@@ -120,8 +120,8 @@ export const POST = auth(async (req, { params }) => {
         }
 
         // Clean number
-        let cleanNumber = number.replace(/\D/g, '');
-        let jid = `${cleanNumber}@s.whatsapp.net`;
+        const cleanNumber = number.replace(/\D/g, '');
+        const jid = `${cleanNumber}@s.whatsapp.net`;
 
         const contact = await prisma.phoneBook.create({
             data: {

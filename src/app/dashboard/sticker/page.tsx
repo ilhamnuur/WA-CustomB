@@ -36,7 +36,7 @@ export default function StickerPage() {
     const handleSend = async () => {
         if (!sessionId || !target || !file) return toast.error("Please fill all fields");
 
-        let jid = target.includes('@') ? target : `${target}@s.whatsapp.net`;
+        const jid = target.includes('@') ? target : `${target}@s.whatsapp.net`;
         const encodedJid = encodeURIComponent(jid);
 
         setLoading(true);

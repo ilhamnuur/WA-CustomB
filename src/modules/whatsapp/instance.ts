@@ -6,7 +6,7 @@ import makeWASocket, {
     ConnectionState
 } from "@whiskeysockets/baileys";
 import { prisma } from "@/lib/prisma";
-import { usePrismaAuthState } from "./auth/usePrismaAuthState";
+import { getPrismaAuthState } from "./auth/getPrismaAuthState";
 import { Server } from "socket.io";
 import pino from "pino";
 import { bindSessionStore } from "./store";
@@ -45,7 +45,7 @@ export class WhatsAppInstance {
         this.config = sessionData?.config || {};
         const botConfig = (sessionData as any)?.botConfig;
 
-        const { state, saveCreds } = await usePrismaAuthState(this.sessionId);
+        const { state, saveCreds } = await getPrismaAuthState(this.sessionId);
         const { version } = await fetchLatestBaileysVersion();
 
         this.socket = makeWASocket({

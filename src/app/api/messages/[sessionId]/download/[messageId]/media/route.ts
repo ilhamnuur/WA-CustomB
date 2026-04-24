@@ -46,7 +46,7 @@ export async function GET(
         }
 
         // For local files, read and return
-        const filePath = path.join(process.cwd(), message.mediaUrl);
+        const filePath = path.join(/* turbopackIgnore: true */ process.cwd(), message.mediaUrl);
         
         if (!fs.existsSync(filePath)) {
             return NextResponse.json({ status: false, message: "Media file not found on disk", error: "Media file not found on disk" }, { status: 404 });
