@@ -170,10 +170,17 @@ model AutoReply {
   isMedia     Boolean  @default(false)
   mediaUrl    String?
   triggerType String   @default("ALL") // ALL, GROUP, PRIVATE
+  
+  // New scheduling fields
+  activeDays  String?  @default("all") // all, work_days, weekend, custom
+  startTime   String?  // HH:mm
+  endTime     String?  // HH:mm
+
   createdAt   DateTime @default(now())
 
   session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }
+
 
 model Story {
   id          String   @id @default(cuid())

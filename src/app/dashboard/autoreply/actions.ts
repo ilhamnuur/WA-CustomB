@@ -35,7 +35,17 @@ export async function getAutoReplies(sessionId: string) {
 }
 
 // Create a new auto reply directly to DB
-export async function createAutoReply(sessionId: string, data: { keyword: string; response: string; matchType: string; isMedia: boolean; mediaUrl?: string | null; triggerType: string }) {
+export async function createAutoReply(sessionId: string, data: { 
+    keyword: string; 
+    response: string; 
+    matchType: string; 
+    isMedia: boolean; 
+    mediaUrl?: string | null; 
+    triggerType: string;
+    activeDays?: string;
+    startTime?: string;
+    endTime?: string;
+}) {
     const nextAuthSession = await getAuthenticatedUserForAction();
     if (!nextAuthSession) {
         throw new Error("Unauthorized");
@@ -66,9 +76,12 @@ export async function createAutoReply(sessionId: string, data: { keyword: string
         matchType: data.matchType || "EXACT",
         isMedia: data.isMedia || false,
         mediaUrl: data.mediaUrl || null,
-        // @ts-ignore
-        triggerType: data.triggerType || "ALL"
+        triggerType: data.triggerType || "ALL",
+        activeDays: data.activeDays || "all",
+        startTime: data.startTime || null,
+        endTime: data.endTime || null,
     };
+
 
     const newRule = await prisma.autoReply.create({
         data: createData

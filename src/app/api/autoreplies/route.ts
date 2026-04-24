@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { sessionId, keyword, response, matchType } = body;
+        const { sessionId, keyword, response, matchType, activeDays, startTime, endTime } = body;
 
         if (!sessionId || !keyword || !response) {
             return NextResponse.json({ status: false, message: "Missing required fields", error: "Missing required fields" }, { status: 400 });
@@ -92,9 +92,13 @@ export async function POST(request: NextRequest) {
                 keyword,
                 response,
                 matchType: matchType || "EXACT",
-                isMedia: false
+                isMedia: false,
+                activeDays: activeDays || "all",
+                startTime: startTime || null,
+                endTime: endTime || null
             }
         });
+
 
         return NextResponse.json(newRule);
 

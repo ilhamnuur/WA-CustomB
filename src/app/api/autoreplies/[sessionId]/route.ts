@@ -85,9 +85,12 @@ export async function POST(
             matchType: matchType || "EXACT",
             isMedia: isMedia || false,
             mediaUrl: mediaUrl || null,
-            // @ts-ignore: triggerType exists in generated schema but may be stale in editor types
-            triggerType: (body.triggerType as string) || "ALL"
+            triggerType: (body.triggerType as string) || "ALL",
+            activeDays: (body.activeDays as string) || "all",
+            startTime: (body.startTime as string) || null,
+            endTime: (body.endTime as string) || null
         };
+
 
         const newRule = await prisma.autoReply.create({
             data: createData

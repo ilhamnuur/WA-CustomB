@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import type { WASocket } from "@whiskeysockets/baileys";
 import { normalizeMessageContent } from "@whiskeysockets/baileys";
 import { logger } from "@/lib/logger";
+import moment from "moment-timezone";
+
 
 // Helper for permission check (Deduplicate from command-handler if possible, but keep simple here)
 function canAutoReply(config: any, fromMe: boolean, senderJid: string): boolean {
@@ -50,6 +52,53 @@ function canAutoReply(config: any, fromMe: boolean, senderJid: string): boolean 
 
     return false;
 }
+
+async function isRuleActive(rule: any): Promise<boolean> {
+    // Get timezone from SystemConfig (Singleton)
+    const sysConfig = await prisma.systemConfig.findUnique({
+        where: { id: 'default' }
+    });
+    const timezone = sysConfig?.timezone || 'Asia/Jakarta';
+    
+    const now = moment().tz(timezone);
+    const day = now.day(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    
+    // Check Days
+    if (rule.activeDays === 'work_days') {
+        // Monday (1) to Friday (5)
+        if (day === 0 || day === 6) return false;
+    } else if (rule.activeDays === 'weekend') {
+        // Saturday (6) and Sunday (0)
+        if (day !== 0 && day !== 6) return false;
+    }
+    
+    // Check Hours
+    if (rule.startTime && rule.endTime) {
+        const currentTime = now.hours() * 60 + now.minutes();
+        
+        const [startH, startM] = rule.startTime.split(':').map(Number);
+        const [endH, endM] = rule.endTime.split(':').map(Number);
+        
+        const startTimeInMinutes = startH * 60 + startM;
+        const endTimeInMinutes = endH * 60 + endM;
+        
+        // Handle overnight shifts if needed? 
+        // For now assume simple same-day range (e.g. 08:00 to 17:00)
+        if (startTimeInMinutes < endTimeInMinutes) {
+            if (currentTime < startTimeInMinutes || currentTime > endTimeInMinutes) {
+                return false;
+            }
+        } else {
+            // Overnight (e.g. 22:00 to 05:00)
+            if (currentTime < startTimeInMinutes && currentTime > endTimeInMinutes) {
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
 
 export async function bindAutoReply(sock: WASocket, sessionId: string) {
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -139,7 +188,15 @@ export async function bindAutoReply(sock: WASocket, sessionId: string) {
                     }
 
                     if (match) {
+                        // Check Scheduling
+                        const active = await isRuleActive(rule);
+                        if (!active) {
+                            logger.debug("AutoReply", `Match found for ${rule.keyword} but rule is not active at this time.`);
+                            continue;
+                        }
+
                         // Check trigger context (GROUP, PRIVATE, or ALL)
+
                         const isGroup = remoteJid.endsWith('@g.us');
                         const triggerType = (rule as any).triggerType || 'ALL'; // Default to ALL if undefined
 

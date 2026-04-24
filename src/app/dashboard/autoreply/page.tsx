@@ -41,8 +41,12 @@ interface AutoReply {
     isMedia: boolean;
     mediaUrl: string | null;
     triggerType: string;
+    activeDays: string;
+    startTime: string | null;
+    endTime: string | null;
     createdAt: Date;
 }
+
 
 export default function AutoReplyPage() {
     const { sessionId } = useSession();
@@ -57,6 +61,10 @@ export default function AutoReplyPage() {
     const [response, setResponse] = useState("");
     const [matchType, setMatchType] = useState("EXACT");
     const [triggerType, setTriggerType] = useState("ALL");
+    const [activeDays, setActiveDays] = useState("all");
+    const [startTime, setStartTime] = useState("");
+    const [endTime, setEndTime] = useState("");
+
 
     useEffect(() => {
         if (sessionId) {
@@ -95,8 +103,13 @@ export default function AutoReplyPage() {
                 matchType,
                 triggerType,
                 isMedia: false, // For simplicity in this V1 UI
-                mediaUrl: null
+                mediaUrl: null,
+                activeDays,
+                startTime: startTime || undefined,
+                endTime: endTime || undefined
             });
+
+
 
             toast.success("Auto-reply rule created");
             setIsCreateOpen(false);
@@ -128,7 +141,11 @@ export default function AutoReplyPage() {
         setResponse("");
         setMatchType("EXACT");
         setTriggerType("ALL");
+        setActiveDays("all");
+        setStartTime("");
+        setEndTime("");
     };
+
 
     if (!sessionId) {
         return (
@@ -198,16 +215,51 @@ export default function AutoReplyPage() {
                             <div className="space-y-2">
                                 <Label>Select Trigger Audience</Label>
                                 <Select value={triggerType} onValueChange={setTriggerType}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="ALL">Everyone & Groups</SelectItem>
-                                        <SelectItem value="PRIVATE">Private Chats Only</SelectItem>
-                                        <SelectItem value="GROUP">Group Chats Only</SelectItem>
-                                    </SelectContent>
+                                     <SelectTrigger>
+                                         <SelectValue />
+                                     </SelectTrigger>
+                                     <SelectContent>
+                                         <SelectItem value="ALL">Everyone & Groups</SelectItem>
+                                         <SelectItem value="PRIVATE">Private Chats Only</SelectItem>
+                                         <SelectItem value="GROUP">Group Chats Only</SelectItem>
+                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Active Days</Label>
+                                    <Select value={activeDays} onValueChange={setActiveDays}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">Every Day</SelectItem>
+                                            <SelectItem value="work_days">Work Days (Mon-Fri)</SelectItem>
+                                            <SelectItem value="weekend">Weekend (Sat-Sun)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Active Hours (Optional)</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Input 
+                                            type="time" 
+                                            value={startTime} 
+                                            onChange={(e) => setStartTime(e.target.value)} 
+                                            className="h-9 px-2"
+                                        />
+                                        <span className="text-muted-foreground text-xs">to</span>
+                                        <Input 
+                                            type="time" 
+                                            value={endTime} 
+                                            onChange={(e) => setEndTime(e.target.value)} 
+                                            className="h-9 px-2"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
 
                             <div className="space-y-2">
                                 <Label>Reply Message</Label>
@@ -256,7 +308,16 @@ export default function AutoReplyPage() {
                                         <div className="flex gap-2 flex-wrap text-xs">
                                             <Badge variant="outline" className="text-muted-foreground font-normal shrink-0">{rule.matchType}</Badge>
                                             <Badge variant="secondary" className="font-normal shrink-0 text-[10px]">{rule.triggerType}</Badge>
+                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-normal shrink-0 text-[10px]">
+                                                {rule.activeDays === 'all' ? 'Everyday' : rule.activeDays === 'work_days' ? 'Work Days' : 'Weekend'}
+                                            </Badge>
+                                            {rule.startTime && rule.endTime && (
+                                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 font-normal shrink-0 text-[10px]">
+                                                    {rule.startTime} - {rule.endTime}
+                                                </Badge>
+                                            )}
                                         </div>
+
                                     </div>
                                     <div className="shrink-0 flex gap-1">
                                         <AlertDialog>
