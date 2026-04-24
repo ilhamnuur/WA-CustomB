@@ -296,7 +296,7 @@ export default function CustomBlastPage() {
                                                 <div className="flex flex-col items-center gap-2">
                                                     <CheckCircle2 className="h-10 w-10 text-green-500" />
                                                     <p className="text-sm font-medium truncate max-w-full">{fileName}</p>
-                                                    <Button variant="ghost" size="xs" onClick={(e) => { e.stopPropagation(); setFileName(""); setExcelData([]); }}>
+                                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setFileName(""); setExcelData([]); }}>
                                                         Change File
                                                     </Button>
                                                 </div>
