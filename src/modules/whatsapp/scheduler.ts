@@ -62,6 +62,37 @@ const checkScheduledMessages = async () => {
                     throw new Error("No recipients found for this message.");
                 }
 
+                // --- Day Matching Logic ---
+                const day = now.getDay(); // 0: Sun, 1: Mon, ..., 6: Sat
+                let dayMatches = true;
+
+                if (msg.scheduleType === 'working_days' && (day === 0 || day === 6)) dayMatches = false;
+                if (msg.scheduleType === 'mon_to_thu' && (day === 0 || day === 5 || day === 6)) dayMatches = false;
+                if (msg.scheduleType === 'holidays' && (day >= 1 && day <= 5)) dayMatches = false;
+                if (msg.scheduleType === 'every_monday' && day !== 1) dayMatches = false;
+                if (msg.scheduleType === 'every_tuesday' && day !== 2) dayMatches = false;
+                if (msg.scheduleType === 'every_wednesday' && day !== 3) dayMatches = false;
+                if (msg.scheduleType === 'every_thursday' && day !== 4) dayMatches = false;
+                if (msg.scheduleType === 'every_friday' && day !== 5) dayMatches = false;
+                if (msg.scheduleType === 'every_saturday' && day !== 6) dayMatches = false;
+                if (msg.scheduleType === 'every_sunday' && day !== 0) dayMatches = false;
+
+                if (!dayMatches) {
+                    // Skip sending today, reschedule for tomorrow
+                    const nextSend = new Date(msg.sendAt.getTime() + 24 * 60 * 60 * 1000);
+                    await prisma.scheduledMessage.update({
+                        where: { id: msg.id },
+                        data: { 
+                            sendAt: nextSend, 
+                            status: "PENDING",
+                            updatedAt: new Date() 
+                        }
+                    });
+                    logger.info("Scheduler", `Msg ${msg.id} day mismatch (Type: ${msg.scheduleType}, Day: ${day}). Rescheduled to tomorrow.`);
+                    continue; // Skip the rest of the loop for this message
+                }
+                // --------------------------
+
                 // Prepare Content
                 let content: any = {};
                 if (msg.mediaUrl) {

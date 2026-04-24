@@ -318,7 +318,15 @@ export default function SchedulerPage() {
                                             <SelectItem value="once">Once (One-time delivery)</SelectItem>
                                             <SelectItem value="every_day">Daily (Every 24 hours)</SelectItem>
                                             <SelectItem value="working_days">Working Days (Mon - Fri)</SelectItem>
+                                            <SelectItem value="mon_to_thu">Working Days (Mon - Thu)</SelectItem>
                                             <SelectItem value="holidays">Weekends (Sat - Sun)</SelectItem>
+                                            <SelectItem value="every_monday">Every Monday</SelectItem>
+                                            <SelectItem value="every_tuesday">Every Tuesday</SelectItem>
+                                            <SelectItem value="every_wednesday">Every Wednesday</SelectItem>
+                                            <SelectItem value="every_thursday">Every Thursday</SelectItem>
+                                            <SelectItem value="every_friday">Every Friday</SelectItem>
+                                            <SelectItem value="every_saturday">Every Saturday</SelectItem>
+                                            <SelectItem value="every_sunday">Every Sunday</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -402,7 +410,7 @@ export default function SchedulerPage() {
                                             
                                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground font-medium">
                                                 <span className="flex items-center gap-1"><Clock size={12} /> {new Date(msg.sendAt).toLocaleString()}</span>
-                                                <span className="flex items-center gap-1 uppercase tracking-wider"><Repeat size={12} /> {msg.scheduleType?.replace('_', ' ')}</span>
+                                                <span className="flex items-center gap-1 uppercase tracking-wider"><Repeat size={12} /> {msg.scheduleType?.replace(/_/g, ' ')}</span>
                                             </div>
                                         </div>
                                         
