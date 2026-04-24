@@ -203,13 +203,13 @@ export default function CustomBlastPage() {
 
                 if (res.ok) {
                     setStats(prev => ({ ...prev, success: prev.success + 1 }));
-                    setLogs(prev => [{ phone: cleanPhone, status: "success", message: "Sent successfully" }, ...prev].slice(0, 50));
+                    setLogs(prev => [{ phone: cleanPhone, status: "success" as const, message: "Sent successfully" }, ...prev].slice(0, 50));
                 } else {
                     throw new Error("Failed to send");
                 }
             } catch (error) {
                 setStats(prev => ({ ...prev, failed: prev.failed + 1 }));
-                setLogs(prev => [{ phone: cleanPhone, status: "error", message: "Failed to send" }, ...prev].slice(0, 50));
+                setLogs(prev => [{ phone: cleanPhone, status: "error" as const, message: "Failed to send" }, ...prev].slice(0, 50));
             }
 
             setProgress(Math.round(((i + 1) / data.length) * 100));
