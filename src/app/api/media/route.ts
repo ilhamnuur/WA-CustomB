@@ -85,7 +85,8 @@ export async function GET(request: NextRequest) {
         // Build response
         const files = await Promise.all(
             ownedFiles.map(async ({ name, parsed }) => {
-                const filePath = path.join(MEDIA_DIR, name);
+                const safeDir = path.resolve(process.cwd(), "data", "media");
+                const filePath = path.normalize(`${safeDir}/${name}`);
                 const fileStat = await stat(filePath);
                 const ext = path.extname(name).toLowerCase();
 
@@ -180,7 +181,8 @@ export async function DELETE(request: NextRequest) {
                 }
             }
 
-            const filePath = path.join(MEDIA_DIR, filename);
+            const safeDir = path.resolve(process.cwd(), "data", "media");
+            const filePath = path.normalize(`${safeDir}/${filename}`);
             if (!existsSync(filePath)) {
                 errors.push(`Not found: ${filename}`);
                 failed++;

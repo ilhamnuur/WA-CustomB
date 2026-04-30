@@ -48,11 +48,11 @@ export async function GET(
             }
         }
 
-        const filePath = path.join(MEDIA_DIR, filename);
+        const safeDir = path.resolve(process.cwd(), "data", "media");
+        const filePath = path.normalize(`${safeDir}/${filename}`);
 
         // Ensure resolved path is still within MEDIA_DIR
-        const resolvedPath = path.resolve(filePath);
-        if (!resolvedPath.startsWith(path.resolve(MEDIA_DIR))) {
+        if (!filePath.startsWith(safeDir)) {
             return NextResponse.json({ status: false, message: "Access denied", error: "Access denied" }, { status: 403 });
         }
 
