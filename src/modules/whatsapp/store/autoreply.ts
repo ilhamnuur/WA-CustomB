@@ -54,7 +54,6 @@ function canAutoReply(config: any, fromMe: boolean, senderJid: string): boolean 
 }
 
 async function isRuleActive(rule: any): Promise<boolean> {
-    // Get timezone from SystemConfig (Singleton)
     const sysConfig = await prisma.systemConfig.findUnique({
         where: { id: 'default' }
     });
@@ -62,6 +61,8 @@ async function isRuleActive(rule: any): Promise<boolean> {
     
     const now = moment().tz(timezone);
     const day = now.day(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+    if (rule.isActive === false) return false;
     
     // Check Days
     if (rule.activeDays === 'work_days') {

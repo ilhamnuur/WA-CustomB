@@ -24,6 +24,7 @@ import { SearchFilter } from "@/components/dashboard/search-filter";
 import { useSession } from "@/components/dashboard/session-provider";
 import { SessionGuard } from "@/components/dashboard/session-guard";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 
 interface ScheduledMessage {
     id: string;
@@ -35,6 +36,7 @@ interface ScheduledMessage {
     mediaType?: string;
     type: string;
     scheduleType: string;
+    isActive: boolean;
 }
 
 export default function SchedulerPage() {
@@ -200,6 +202,25 @@ export default function SchedulerPage() {
             toast.error("An error occurred");
         } finally {
             setDeleteId(null);
+        }
+    };
+
+    const handleToggleActive = async (msgId: string, currentStatus: boolean) => {
+        if (!selectedSessionId) return;
+        try {
+            const res = await fetch(`/api/scheduler/${selectedSessionId}/${msgId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isActive: !currentStatus })
+            });
+            if (res.ok) {
+                toast.success(`Task ${!currentStatus ? 'enabled' : 'disabled'}`);
+                setMessages(messages.map(m => m.id === msgId ? { ...m, isActive: !currentStatus } : m));
+            } else {
+                toast.error("Failed to update status");
+            }
+        } catch (error) {
+            toast.error("An error occurred");
         }
     };
 
@@ -384,8 +405,9 @@ export default function SchedulerPage() {
                 ) : (
                     <div className="grid gap-4">
                         {filteredMessages.map(msg => (
-                            <Card key={msg.id} className={`overflow-hidden transition-all hover:shadow-md ${msg.status === 'SENT' ? 'bg-muted/10 opacity-75' : ''}`}>
+                            <Card key={msg.id} className={`overflow-hidden transition-all hover:shadow-md ${msg.status === 'SENT' ? 'bg-muted/10 opacity-75' : ''} ${!msg.isActive ? 'opacity-60 grayscale-[0.5]' : ''}`}>
                                 <div className={`h-1 w-full ${
+                                    !msg.isActive ? 'bg-gray-300' :
                                     msg.status === 'PENDING' ? 'bg-yellow-400' : 
                                     msg.status === 'SENT' ? 'bg-green-500' : 
                                     msg.status === 'SENDING' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'
@@ -414,13 +436,21 @@ export default function SchedulerPage() {
                                             </div>
                                         </div>
                                         
-                                        <div className="flex md:flex-col justify-end gap-2 shrink-0">
-                                            <Button variant="outline" size="sm" onClick={() => handleEdit(msg)} disabled={msg.status === 'SENDING'}>
-                                                Edit
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => setDeleteId(msg.id)} title="Cancel" className="text-destructive hover:bg-red-50">
-                                                <Trash2 size={16} />
-                                            </Button>
+                                        <div className="flex md:flex-col items-end justify-between gap-2 shrink-0">
+                                            <div className="flex items-center space-x-2 mb-1">
+                                                <Switch 
+                                                    checked={msg.isActive} 
+                                                    onCheckedChange={() => handleToggleActive(msg.id, msg.isActive)} 
+                                                />
+                                            </div>
+                                            <div className="flex justify-end gap-1">
+                                                <Button variant="outline" size="sm" onClick={() => handleEdit(msg)} disabled={msg.status === 'SENDING'}>
+                                                    Edit
+                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => setDeleteId(msg.id)} title="Cancel" className="text-destructive hover:bg-red-50">
+                                                    <Trash2 size={16} />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                     {msg.status === 'FAILED' && (

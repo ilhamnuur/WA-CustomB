@@ -24,7 +24,8 @@ const checkScheduledMessages = async () => {
         const pendingMessages = await prisma.scheduledMessage.findMany({
             where: {
                 status: { in: ["PENDING", "SENDING"] },
-                sendAt: { lte: now }
+                sendAt: { lte: now },
+                isActive: true
             },
             include: {
                 session: true

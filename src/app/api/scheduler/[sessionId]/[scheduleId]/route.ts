@@ -91,3 +91,35 @@ export async function DELETE(
         return NextResponse.json({ status: false, message: "Internal Server Error", error: "Internal Server Error" }, { status: 500 });
     }
 }
+
+export async function PATCH(
+    request: NextRequest,
+    { params }: { params: Promise<{ sessionId: string; scheduleId: string }> }
+) {
+    try {
+        const { sessionId, scheduleId } = await params;
+        const user = await getAuthenticatedUser(request);
+        if (!user) {
+            return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
+        }
+
+        const canAccess = await canAccessSession(user.id, user.role, sessionId);
+        if (!canAccess) {
+            return NextResponse.json({ status: false, message: "Forbidden" }, { status: 403 });
+        }
+
+        const body = await request.json();
+        if (typeof body.isActive !== 'boolean') {
+            return NextResponse.json({ status: false, message: "Invalid payload" }, { status: 400 });
+        }
+
+        const updated = await prisma.scheduledMessage.update({
+            where: { id: scheduleId },
+            data: { isActive: body.isActive }
+        });
+
+        return NextResponse.json({ status: true, data: updated });
+    } catch (error) {
+        return NextResponse.json({ status: false, message: "Internal Server Error" }, { status: 500 });
+    }
+}

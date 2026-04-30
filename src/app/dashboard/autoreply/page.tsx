@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getAutoReplies, createAutoReply, deleteAutoReply } from "./actions";
+import { getAutoReplies, createAutoReply, deleteAutoReply, toggleAutoReplyActive } from "./actions";
+import { Switch } from "@/components/ui/switch";
 
 interface AutoReply {
     id: string;
@@ -44,6 +45,7 @@ interface AutoReply {
     activeDays: string;
     startTime: string | null;
     endTime: string | null;
+    isActive: boolean;
     createdAt: Date;
 }
 
@@ -133,6 +135,18 @@ export default function AutoReplyPage() {
         } catch (error: any) {
             console.error(error);
             toast.error(error.message || "Error deleting auto-reply");
+        }
+    };
+
+    const handleToggleActive = async (ruleId: string, currentStatus: boolean) => {
+        if (!sessionId) return;
+        try {
+            await toggleAutoReplyActive(sessionId, ruleId, !currentStatus);
+            toast.success(`Auto-reply ${!currentStatus ? 'enabled' : 'disabled'}`);
+            fetchRules();
+        } catch (error: any) {
+            console.error(error);
+            toast.error(error.message || "Error updating status");
         }
     };
 
@@ -319,7 +333,13 @@ export default function AutoReplyPage() {
                                         </div>
 
                                     </div>
-                                    <div className="shrink-0 flex gap-1">
+                                    <div className="shrink-0 flex items-center gap-2">
+                                        <div className="flex items-center space-x-2 mr-2">
+                                            <Switch 
+                                                checked={rule.isActive} 
+                                                onCheckedChange={() => handleToggleActive(rule.id, rule.isActive)} 
+                                            />
+                                        </div>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10">
