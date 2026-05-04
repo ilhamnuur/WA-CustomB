@@ -20,7 +20,7 @@ export async function PUT(
         }
 
         const body = await request.json();
-        const { jid, content, sendAt, mediaUrl, mediaType } = body;
+        const { jid, content, sendAt, mediaUrl, mediaType, type, scheduleType } = body;
 
         if (!jid || !content || !sendAt) {
             return NextResponse.json({ status: false, message: "JID, content, and sendAt are required", error: "JID, content, and sendAt are required" }, { status: 400 });
@@ -42,7 +42,9 @@ export async function PUT(
                 content,
                 sendAt: utcDate,
                 mediaUrl: mediaUrl || null,
-                mediaType: mediaType || null
+                mediaType: mediaType || null,
+                type: type || undefined,
+                scheduleType: scheduleType || undefined
             }
         });
 

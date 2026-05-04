@@ -21,11 +21,14 @@ const checkScheduledMessages = async () => {
         const now = new Date();
         // logger.debug("Scheduler", `Checking messages at ${now.toISOString()}`);
 
+        const fiveMinsAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
         const pendingMessages = await prisma.scheduledMessage.findMany({
             where: {
-                status: { in: ["PENDING", "SENDING"] },
-                sendAt: { lte: now },
-                isActive: true
+                OR: [
+                    { status: "PENDING", sendAt: { lte: now }, isActive: true },
+                    { status: "SENDING", updatedAt: { lte: fiveMinsAgo }, isActive: true }
+                ]
             },
             include: {
                 session: true
